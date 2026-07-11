@@ -1384,8 +1384,12 @@ function ContactView() {
    6. ADMIN PORTAL VIEW
    ========================================================================== */
 function AdminView() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [password, setPassword] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isAdminAuthenticated') === 'true';
+  });
+  const [password, setPassword] = useState(() => {
+    return localStorage.getItem('adminPassword') || '';
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [repairs, setRepairs] = useState([]);
@@ -1396,43 +1400,57 @@ function AdminView() {
   const [brandFilter, setBrandFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  // Handle Login
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (password === 'admin123') { // Simple default matching backend env
-      setIsAuthenticated(true);
-      setError('');
-      fetchAdminData();
-    } else {
-      setError('Invalid admin password.');
-    }
-  };
-
   // Fetch all bookings and contacts
-  const fetchAdminData = async () => {
+  const fetchAdminData = async (authPass = password) => {
     try {
       // Get repairs
       const repairsRes = await fetch(`${API_BASE}/admin/repairs`, {
-        headers: { 'x-admin-password': password }
+        headers: { 'x-admin-password': authPass }
       });
+      if (!repairsRes.ok) {
+        if (repairsRes.status === 401 || repairsRes.status === 403) {
+          throw new Error('Unauthorized');
+        }
+        throw new Error('Failed to fetch data');
+      }
       const repairsData = await repairsRes.json();
-      if (repairsRes.ok) setRepairs(repairsData);
+      setRepairs(repairsData);
 
       // Get contacts
       const contactsRes = await fetch(`${API_BASE}/admin/contacts`, {
-        headers: { 'x-admin-password': password }
+        headers: { 'x-admin-password': authPass }
       });
       const contactsData = await contactsRes.json();
       if (contactsRes.ok) setContacts(contactsData);
+
+      // Successfully authenticated
+      setIsAuthenticated(true);
+      setError('');
+      localStorage.setItem('isAdminAuthenticated', 'true');
+      localStorage.setItem('adminPassword', authPass);
     } catch (err) {
       console.error('Error fetching admin data:', err);
+      if (err.message === 'Unauthorized') {
+        setError('Invalid admin password.');
+        setIsAuthenticated(false);
+        localStorage.removeItem('isAdminAuthenticated');
+        localStorage.removeItem('adminPassword');
+      } else {
+        setError('Server connection error. Failed to retrieve data.');
+      }
     }
+  };
+
+  // Handle Login
+  const handleLogin = (e) => {
+    e.preventDefault();
+    fetchAdminData(password);
   };
 
   // Trigger fetch updates when authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchAdminData();
+    if (isAuthenticated && password) {
+      fetchAdminData(password);
     }
   }, [isAuthenticated]);
 
@@ -1543,7 +1561,16 @@ function AdminView() {
     <div className="container section">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <h2 style={{ fontSize: '1.8rem', fontWeight: '800', margin: 0, textAlign: 'left' }}>Management Panel</h2>
-        <button className="btn btn-secondary" onClick={() => setIsAuthenticated(false)} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => {
+            setIsAuthenticated(false);
+            setPassword('');
+            localStorage.removeItem('isAdminAuthenticated');
+            localStorage.removeItem('adminPassword');
+          }} 
+          style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+        >
           Logout <LogOut size={14} />
         </button>
       </div>
