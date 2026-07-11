@@ -23,7 +23,9 @@ import {
   Check,
   Building,
   UserCheck,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 import servicesData from './servicesData';
@@ -1384,6 +1386,7 @@ function ContactView() {
 function AdminView() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [repairs, setRepairs] = useState([]);
   const [contacts, setContacts] = useState([]);
@@ -1491,15 +1494,41 @@ function AdminView() {
           <form onSubmit={handleLogin}>
             <div className="form-group">
               <label className="form-label" htmlFor="admin_pass">Password</label>
-              <input
-                type="password"
-                id="admin_pass"
-                className="form-input"
-                placeholder="Enter password (default: admin123)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  id="admin_pass"
+                  className="form-input"
+                  placeholder="Enter password (default: admin123)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{ paddingRight: '48px' }}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '4px',
+                    borderRadius: '4px',
+                    outline: 'none'
+                  }}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
             <button type="submit" className="btn btn-primary btn-block">
               Authenticate <ChevronRight size={16} />
