@@ -150,6 +150,44 @@ const servicesData = [
         tagType: "info"
       }
     ]
+  },
+  {
+    id: "acer",
+    name: "Acer",
+    type: "laptop",
+    subtitle: "Laptop Care",
+    desc: "Complete support for Aspire, Swift, Spin, Nitro, and Predator gaming series.",
+    badgeClass: "laptop-badge",
+    badgeText: "Laptop Care",
+    logoType: "AcerLogo",
+    accentColor: "var(--color-acer)",
+    features: [
+      "Predator/Nitro Fan cleaning",
+      "Keyboard & Screen swap",
+      "Power board IC repair"
+    ],
+    services: [
+      {
+        name: "Acer Predator & Nitro Series Dual-Fan Cooling & Thermal Paste Service",
+        tag: "Advanced Cooling",
+        tagType: "success"
+      },
+      {
+        name: "Acer HD/FHD LED Screen Assembly Replacement",
+        tag: "OEM Calibration",
+        tagType: "info"
+      },
+      {
+        name: "Acer Power Board & Charger IC Component Micro-Soldering",
+        tag: "Micro-Soldering Work",
+        tagType: "info"
+      },
+      {
+        name: "Genuine Acer Keyboard & Palmrest Replacement",
+        tag: "OEM Replacements",
+        tagType: "info"
+      }
+    ]
   }
 ];
 

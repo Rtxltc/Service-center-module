@@ -22,7 +22,8 @@ import {
   FileText,
   Check,
   Building,
-  UserCheck
+  UserCheck,
+  ExternalLink
 } from 'lucide-react';
 
 import servicesData from './servicesData';
@@ -55,11 +56,19 @@ const AsusLogo = ({ size = 24, style = {}, className = "" }) => (
   </svg>
 );
 
+const AcerLogo = ({ size = 24, style = {}, className = "" }) => (
+  <svg viewBox="0 0 80 20" width={size * 3} height={size} fill="currentColor" style={{ ...style, display: 'inline-block' }} className={className} xmlns="http://www.w3.org/2000/svg">
+    <title>Acer</title>
+    <text x="0" y="16" fontFamily="'Outfit', 'Inter', sans-serif" fontWeight="900" fontSize="18" letterSpacing="-0.5px">acer</text>
+  </svg>
+);
+
 const LogoComponents = {
   MotorolaLogo,
   DellLogo,
   HpLogo,
-  AsusLogo
+  AsusLogo,
+  AcerLogo
 };
 
 const RelianceResqLogo = ({ size = 20, className = "" }) => (
@@ -249,9 +258,9 @@ function App() {
       <header className="navbar">
         <div className="container nav-container">
           <div className="logo" onClick={() => setActiveTab('home')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <MotorolaLogo size={28} style={{ color: 'var(--color-moto)', flexShrink: 0 }} />
+            <img src="/favicon.png" alt="Reliance Resq Service Logo" style={{ width: '28px', height: '28px', objectFit: 'contain', flexShrink: 0 }} />
             <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: '800', lineHeight: '1.1' }}>Motorola Service Center</span>
+              <span style={{ fontSize: '1.25rem', fontWeight: '800', lineHeight: '1.1' }}>ReLince Resq Service</span>
               <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 Affiliated with <RelianceResqLogo size={9} />
               </span>
@@ -350,8 +359,8 @@ function App() {
       <footer className="footer">
         <div className="container">
           <div className="footer-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <MotorolaLogo size={22} style={{ color: 'var(--color-moto)' }} />
-            <span>Motorola Service Center</span>
+            <img src="/favicon.png" alt="Reliance Resq Service Logo" style={{ width: '22px', height: '22px', objectFit: 'contain' }} />
+            <span>Reliance Resq Multi Brand Authorised Service center</span>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '500' }}>|</span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
               Authorized Service Affiliate: <RelianceResqLogo size={10} />
@@ -418,7 +427,7 @@ function HomeView({ setActiveTab, slides, onUploadSlide, setSelectedBrand }) {
         </div>
 
         <div className="brands-grid">
-          {servicesData.map((brand) => {
+          {servicesData.slice(0, 4).map((brand) => {
             const LogoComponent = LogoComponents[brand.logoType];
             return (
               <div
@@ -456,6 +465,28 @@ function HomeView({ setActiveTab, slides, onUploadSlide, setSelectedBrand }) {
               </div>
             );
           })}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '40px' }}>
+          <button 
+            className="btn btn-secondary" 
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              padding: '12px 28px', 
+              borderRadius: '30px', 
+              fontWeight: '700',
+              fontSize: '0.9rem',
+              boxShadow: 'var(--shadow-sm)'
+            }}
+            onClick={() => {
+              setActiveTab('services');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          >
+            Show More Brands <ChevronRight size={18} />
+          </button>
         </div>
       </section>
 
@@ -1183,17 +1214,25 @@ function ContactView() {
 
               </div>
 
-              <div className="contact-method">
+              <a 
+                href="https://www.google.com/maps?cid=9724902949827405796" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="contact-method"
+                style={{ textDecoration: 'none', color: 'inherit', display: 'flex', gap: '16px' }}
+              >
                 <div className="contact-method-icon">
                   <MapPin size={18} />
                 </div>
                 <div>
-                  <div className="contact-method-title">Visit Our Center</div>
-                  <div className="contact-method-detail">
+                  <div className="contact-method-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    Visit Our Center <ExternalLink size={14} style={{ color: 'var(--color-moto)' }} />
+                  </div>
+                  <div className="contact-method-detail" style={{ textDecoration: 'underline', textDecorationColor: 'rgba(0,0,0,0.1)' }}>
                     Basment floor, gata, Axis bank Charom Enterprises, 55, Raibareli Rd, Naka, Usroo, Faizabad, Uttar Pradesh 224001
                   </div>
                 </div>
-              </div>
+              </a>
             </div>
           </div>
 
@@ -1218,6 +1257,26 @@ function ContactView() {
                 referrerPolicy="strict-origin-when-cross-origin"
               />
             </span>
+            <div style={{ marginTop: '12px', textAlign: 'left' }}>
+              <a 
+                href="https://www.google.com/maps?cid=9724902949827405796" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+                style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  fontSize: '0.85rem', 
+                  padding: '10px 20px', 
+                  borderRadius: '8px', 
+                  fontWeight: '700',
+                  textDecoration: 'none'
+                }}
+              >
+                Open in Google Maps <ExternalLink size={16} />
+              </a>
+            </div>
           </div>
 
         </div>
