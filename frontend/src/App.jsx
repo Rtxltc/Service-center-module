@@ -106,7 +106,19 @@ const DEFAULT_SLIDES = [
   }
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.charom-resq.com/api';
+let rawApiUrl = import.meta.env.VITE_API_URL || 'https://api.charom-resq.com/api';
+
+// 1. Ensure absolute URL if not starting with http or /
+if (rawApiUrl && !rawApiUrl.startsWith('http') && !rawApiUrl.startsWith('/')) {
+  rawApiUrl = 'https://' + rawApiUrl;
+}
+
+// 2. Ensure it ends with /api
+if (rawApiUrl && !rawApiUrl.endsWith('/api') && !rawApiUrl.endsWith('/api/')) {
+  rawApiUrl = rawApiUrl.replace(/\/$/, '') + '/api';
+}
+
+const API_BASE = rawApiUrl;
 
 function Slideshow({ slides, onUploadSlide }) {
   const [currentIndex, setCurrentIndex] = useState(0);
