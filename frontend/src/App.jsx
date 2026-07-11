@@ -97,7 +97,7 @@ const DEFAULT_SLIDES = [
   }
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL;
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.charom-resq.com/api';
 
 function Slideshow({ slides, onUploadSlide }) {
   const [currentIndex, setCurrentIndex] = useState(0);

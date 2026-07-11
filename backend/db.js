@@ -4,7 +4,9 @@ const path = require('path');
 require('dotenv').config();
 
 const isProduction = process.env.NODE_ENV === 'production';
-const mockFilePath = path.join(__dirname, 'mock-db.json');
+const mockFilePath = process.env.VERCEL
+  ? path.join('/tmp', 'mock-db.json')
+  : path.join(__dirname, 'mock-db.json');
 
 // Initialize mock DB file if it doesn't exist
 if (!fs.existsSync(mockFilePath)) {
