@@ -222,7 +222,4 @@ app.get('/api/admin/contacts', checkAdminAuth, async (req, res) => {
   }
 });
 
-// Start listening
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+module.exports = app;
