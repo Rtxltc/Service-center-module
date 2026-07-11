@@ -18,7 +18,7 @@ if (!fs.existsSync(mockFilePath)) {
         issue_description: 'Broken display glass and back cover replacement.',
         customer_name: 'Yash Sharma',
         customer_email: 'yash.sharma@example.com',
-        customer_phone: '9876543210',
+        customer_phone: '8795427739',
         service_type: 'Walk-in',
         status: 'Diagnosis',
         created_at: new Date().toISOString(),
@@ -42,15 +42,15 @@ let pool;
 let useMock = false;
 
 // Create Pool config
-const poolConfig = process.env.DATABASE_URL 
+const poolConfig = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
   : {
-      user: process.env.PGUSER || 'postgres',
-      host: process.env.PGHOST || 'localhost',
-      database: process.env.PGDATABASE || 'motorola_laptop_service',
-      password: process.env.PGPASSWORD || 'postgres',
-      port: parseInt(process.env.PGPORT || '5432'),
-    };
+    user: process.env.PGUSER,
+    host: process.env.PGHOST,
+    database: process.env.PGDATABASE,
+    password: process.env.PGPASSWORD,
+    port: parseInt(process.env.PGPORT),
+  };
 
 if (isProduction) {
   poolConfig.ssl = { rejectUnauthorized: false };
@@ -100,7 +100,7 @@ function writeMockData(data) {
 
 async function mockQuery(text, params = []) {
   const data = readMockData();
-  
+
   // 1. SELECT 1 FROM repairs WHERE ticket_id = $1
   if (text.includes('SELECT 1 FROM repairs WHERE ticket_id = $1')) {
     const ticketId = params[0];
@@ -141,7 +141,7 @@ async function mockQuery(text, params = []) {
   // 4. SELECT * FROM repairs WHERE customer_phone = $1 OR customer_phone LIKE $2
   if (text.includes('customer_phone = $1 OR customer_phone LIKE $2')) {
     const phone = params[0];
-    const matches = data.repairs.filter(r => 
+    const matches = data.repairs.filter(r =>
       r.customer_phone === phone || r.customer_phone.includes(phone)
     ).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     return { rows: matches, rowCount: matches.length };

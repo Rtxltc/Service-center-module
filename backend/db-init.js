@@ -48,7 +48,7 @@ async function init() {
   } finally {
     try {
       await client.end();
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // 2. Connect to the target database and apply schema
@@ -56,11 +56,11 @@ async function init() {
   try {
     const schemaPath = path.join(__dirname, 'schema.sql');
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-    
+
     console.log('Applying schema.sql...');
     await db.query(schemaSql);
     console.log('Database tables and indexes verified/created successfully!');
-    
+
     // Insert a sample record if table is empty
     const checkRepairs = await db.query('SELECT COUNT(*) FROM repairs');
     if (parseInt(checkRepairs.rows[0].count) === 0) {
@@ -69,7 +69,7 @@ async function init() {
       await db.query(
         `INSERT INTO repairs (ticket_id, brand, device_model, issue_description, customer_name, customer_email, customer_phone, service_type, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [seedTicket, 'Motorola', 'Moto Edge 50 Ultra', 'Broken display glass and back cover replacement.', 'Yash Sharma', 'yash.sharma@example.com', '9876543210', 'Walk-in', 'Diagnosis']
+        [seedTicket, 'Motorola', 'Moto Edge 50 Ultra', 'Broken display glass and back cover replacement.', 'Yash Sharma', 'yash.sharma@example.com', '8795427739', 'Walk-in', 'Diagnosis']
       );
       console.log(`Seed record created. Ticket ID: ${seedTicket}`);
     }

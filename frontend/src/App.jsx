@@ -25,41 +25,191 @@ import {
   UserCheck
 } from 'lucide-react';
 
+import servicesData from './servicesData';
+
 const MotorolaLogo = ({ size = 24, style = {}, className = "" }) => (
   <svg role="img" viewBox="0 0 24 24" width={size} height={size} fill="currentColor" style={style} className={className} xmlns="http://www.w3.org/2000/svg">
     <title>Motorola</title>
-    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12C24.002 5.375 18.632.002 12.007 0H12zm7.327 18.065s-.581-2.627-1.528-4.197c-.514-.857-1.308-1.553-2.368-1.532-.745 0-1.399.423-2.2 1.553-.469.77-.882 1.573-1.235 2.403 0 0-.29-.675-.63-1.343a8.038 8.038 0 0 0-.605-1.049c-.804-1.13-1.455-1.539-2.2-1.553-1.049-.021-1.854.675-2.364 1.528-.948 1.574-1.528 4.197-1.528 4.197h-.864l4.606-15.12 3.56 11.804.024.021.024-.021 3.56-11.804 4.61 15.113h-.862z"/>
+    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12C24.002 5.375 18.632.002 12.007 0H12zm7.327 18.065s-.581-2.627-1.528-4.197c-.514-.857-1.308-1.553-2.368-1.532-.745 0-1.399.423-2.2 1.553-.469.77-.882 1.573-1.235 2.403 0 0-.29-.675-.63-1.343a8.038 8.038 0 0 0-.605-1.049c-.804-1.13-1.455-1.539-2.2-1.553-1.049-.021-1.854.675-2.364 1.528-.948 1.574-1.528 4.197-1.528 4.197h-.864l4.606-15.12 3.56 11.804.024.021.024-.021 3.56-11.804 4.61 15.113h-.862z" />
   </svg>
 );
 
 const DellLogo = ({ size = 24, style = {}, className = "" }) => (
   <svg role="img" viewBox="0 0 24 24" width={size} height={size} fill="currentColor" style={style} className={className} xmlns="http://www.w3.org/2000/svg">
     <title>Dell</title>
-    <path d="M17.963 14.6V9.324h1.222v4.204h2.14v1.07h-3.362zm-9.784-3.288l2.98-2.292c.281.228.56.458.841.687l-2.827 2.14.611.535 2.827-2.216c.281.228.56.458.841.688a295.83 295.83 0 0 1-2.827 2.216l.61.536 2.83-2.295-.001-1.986h1.223v4.204h2.216v1.07h-3.362v-1.987c-.995.763-1.987 1.529-2.981 2.292l-2.981-2.292c-.144.729-.653 1.36-1.312 1.694-.285.147-.597.24-.915.276-.183.022-.367.017-.551.017H3.516V9.325H5.69a2.544 2.544 0 0 1 1.563.557c.454.36.778.872.927 1.43m-3.516-.917v3.21l.953-.001a1.377 1.377 0 0 0 1.036-.523 1.74 1.74 0 0 0 .182-1.889 1.494 1.494 0 0 0-.976-.766c-.166-.04-.338-.03-.507-.032h-.688zM11.82 0h.337a11.94 11.94 0 0 1 5.405 1.373 12.101 12.101 0 0 1 4.126 3.557A11.93 11.93 0 0 1 24 11.82v.36a11.963 11.963 0 0 1-3.236 8.033A11.967 11.967 0 0 1 12.182 24h-.361a11.993 11.993 0 0 1-4.145-.806 12.04 12.04 0 0 1-4.274-2.836A12.057 12.057 0 0 1 .576 15.67 12.006 12.006 0 0 1 0 12.181v-.361a11.924 11.924 0 0 1 1.992-6.396 12.211 12.211 0 0 1 4.71-4.172A11.875 11.875 0 0 1 11.82 0m-.153 1.23a10.724 10.724 0 0 0-6.43 2.375 10.78 10.78 0 0 0-3.319 4.573 10.858 10.858 0 0 0 .193 8.12 10.788 10.788 0 0 0 3.546 4.421 10.698 10.698 0 0 0 4.786 1.946c1.456.209 2.955.124 4.376-.26a10.756 10.756 0 0 0 5.075-3.062 10.742 10.742 0 0 0 2.686-5.28 10.915 10.915 0 0 0-.122-4.682 10.77 10.77 0 0 0-7.098-7.626 10.78 10.78 0 0 0-3.693-.525z"/>
+    <path d="M17.963 14.6V9.324h1.222v4.204h2.14v1.07h-3.362zm-9.784-3.288l2.98-2.292c.281.228.56.458.841.687l-2.827 2.14.611.535 2.827-2.216c.281.228.56.458.841.688a295.83 295.83 0 0 1-2.827 2.216l.61.536 2.83-2.295-.001-1.986h1.223v4.204h2.216v1.07h-3.362v-1.987c-.995.763-1.987 1.529-2.981 2.292l-2.981-2.292c-.144.729-.653 1.36-1.312 1.694-.285.147-.597.24-.915.276-.183.022-.367.017-.551.017H3.516V9.325H5.69a2.544 2.544 0 0 1 1.563.557c.454.36.778.872.927 1.43m-3.516-.917v3.21l.953-.001a1.377 1.377 0 0 0 1.036-.523 1.74 1.74 0 0 0 .182-1.889 1.494 1.494 0 0 0-.976-.766c-.166-.04-.338-.03-.507-.032h-.688zM11.82 0h.337a11.94 11.94 0 0 1 5.405 1.373 12.101 12.101 0 0 1 4.126 3.557A11.93 11.93 0 0 1 24 11.82v.36a11.963 11.963 0 0 1-3.236 8.033A11.967 11.967 0 0 1 12.182 24h-.361a11.993 11.993 0 0 1-4.145-.806 12.04 12.04 0 0 1-4.274-2.836A12.057 12.057 0 0 1 .576 15.67 12.006 12.006 0 0 1 0 12.181v-.361a11.924 11.924 0 0 1 1.992-6.396 12.211 12.211 0 0 1 4.71-4.172A11.875 11.875 0 0 1 11.82 0m-.153 1.23a10.724 10.724 0 0 0-6.43 2.375 10.78 10.78 0 0 0-3.319 4.573 10.858 10.858 0 0 0 .193 8.12 10.788 10.788 0 0 0 3.546 4.421 10.698 10.698 0 0 0 4.786 1.946c1.456.209 2.955.124 4.376-.26a10.756 10.756 0 0 0 5.075-3.062 10.742 10.742 0 0 0 2.686-5.28 10.915 10.915 0 0 0-.122-4.682 10.77 10.77 0 0 0-7.098-7.626 10.78 10.78 0 0 0-3.693-.525z" />
   </svg>
 );
 
 const HpLogo = ({ size = 24, style = {}, className = "" }) => (
   <svg role="img" viewBox="0 0 24 24" width={size} height={size} fill="currentColor" style={style} className={className} xmlns="http://www.w3.org/2000/svg">
     <title>HP</title>
-    <path d="M12.0069 24h-.3572l2.459-6.7453h3.3796c.5907 0 1.2364-.4533 1.4424-1.0166l2.6652-7.3085c.4396-1.1952-.2473-2.1706-1.525-2.1706h-4.6983l-3.929 10.798-2.2255 6.127C3.929 22.434 0 17.6806 0 12.007 0 6.498 3.7092 1.8546 8.7647.4396L6.4705 6.759 2.6514 17.2547h2.5415L8.4488 8.339h1.9095l-3.2558 8.9158H9.644l3.0223-8.3251c.4396-1.1952-.2473-2.1706-1.525-2.1706h-2.143l2.459-6.7453C11.636 0 11.8145 0 11.9931 0 18.6285 0 24 5.3715 24 12.007c.0137 6.6216-5.3578 11.993-11.9931 11.993zM19.2742 8.325h-1.9096l-2.6789 7.336h1.9096l2.6789-7.336z"/>
+    <path d="M12.0069 24h-.3572l2.459-6.7453h3.3796c.5907 0 1.2364-.4533 1.4424-1.0166l2.6652-7.3085c.4396-1.1952-.2473-2.1706-1.525-2.1706h-4.6983l-3.929 10.798-2.2255 6.127C3.929 22.434 0 17.6806 0 12.007 0 6.498 3.7092 1.8546 8.7647.4396L6.4705 6.759 2.6514 17.2547h2.5415L8.4488 8.339h1.9095l-3.2558 8.9158H9.644l3.0223-8.3251c.4396-1.1952-.2473-2.1706-1.525-2.1706h-2.143l2.459-6.7453C11.636 0 11.8145 0 11.9931 0 18.6285 0 24 5.3715 24 12.007c.0137 6.6216-5.3578 11.993-11.9931 11.993zM19.2742 8.325h-1.9096l-2.6789 7.336h1.9096l2.6789-7.336z" />
   </svg>
 );
 
 const AsusLogo = ({ size = 24, style = {}, className = "" }) => (
   <svg role="img" viewBox="0 0 24 24" width={size} height={size} fill="currentColor" style={style} className={className} xmlns="http://www.w3.org/2000/svg">
     <title>ASUS</title>
-    <path d="M23.904 10.788V9.522h-4.656c-.972 0-1.41.6-1.482 1.182v.018-1.2h-1.368v1.266h1.362zm-6.144.456l-1.368-.078v1.458c0 .456-.228.594-1.02.594H14.28c-.654 0-.93-.186-.93-.594v-1.596l-1.386-.102v1.812h-.03c-.078-.528-.276-1.14-1.596-1.23L6 11.22c0 .666.474 1.062 1.218 1.14l3.024.306c.24.018.414.09.414.288 0 .216-.18.24-.456.24H5.946V11.22l-1.386-.09v3.348h5.646c1.26 0 1.662-.654 1.722-1.2h.03c.156.864.912 1.2 2.19 1.2h1.41c1.494 0 2.202-.456 2.202-1.524zm4.398.258l-4.338-.258c0 .666.438 1.11 1.182 1.17l3.09.24c.24.018.384.078.384.276 0 .186-.168.258-.516.258h-4.212v1.29h4.302c1.356 0 1.95-.474 1.95-1.554 0-.972-.534-1.338-1.842-1.422zm-10.194-1.98h1.386v1.266h-1.386zM3.798 11.07l-1.506-.15L0 14.478h1.686zm7.914-1.548h-4.23c-.984 0-1.416.612-1.518 1.2v-1.2H3.618c-.33 0-.486.102-.642.33l-.648.936h9.384Z"/>
+    <path d="M23.904 10.788V9.522h-4.656c-.972 0-1.41.6-1.482 1.182v.018-1.2h-1.368v1.266h1.362zm-6.144.456l-1.368-.078v1.458c0 .456-.228.594-1.02.594H14.28c-.654 0-.93-.186-.93-.594v-1.596l-1.386-.102v1.812h-.03c-.078-.528-.276-1.14-1.596-1.23L6 11.22c0 .666.474 1.062 1.218 1.14l3.024.306c.24.018.414.09.414.288 0 .216-.18.24-.456.24H5.946V11.22l-1.386-.09v3.348h5.646c1.26 0 1.662-.654 1.722-1.2h.03c.156.864.912 1.2 2.19 1.2h1.41c1.494 0 2.202-.456 2.202-1.524zm4.398.258l-4.338-.258c0 .666.438 1.11 1.182 1.17l3.09.24c.24.018.384.078.384.276 0 .186-.168.258-.516.258h-4.212v1.29h4.302c1.356 0 1.95-.474 1.95-1.554 0-.972-.534-1.338-1.842-1.422zm-10.194-1.98h1.386v1.266h-1.386zM3.798 11.07l-1.506-.15L0 14.478h1.686zm7.914-1.548h-4.23c-.984 0-1.416.612-1.518 1.2v-1.2H3.618c-.33 0-.486.102-.642.33l-.648.936h9.384Z" />
   </svg>
 );
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const LogoComponents = {
+  MotorolaLogo,
+  DellLogo,
+  HpLogo,
+  AsusLogo
+};
+
+const RelianceResqLogo = ({ size = 20, className = "" }) => (
+  <svg viewBox="0 0 160 40" width={size * 4} height={size} className={className} xmlns="http://www.w3.org/2000/svg" style={{ verticalAlign: 'middle', display: 'inline-block' }}>
+    <text x="5" y="26" fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" fontWeight="800" fontSize="15" fill="#e11d48" letterSpacing="0.5">RELIANCE</text>
+    <text x="90" y="26" fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" fontWeight="800" fontSize="18" fill="#0284c7">res</text>
+    <text x="118" y="26" fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" fontWeight="900" fontSize="22" fill="#f97316">Q</text>
+  </svg>
+);
+
+const DEFAULT_SLIDES = [
+  {
+    id: 'slide-1',
+    image: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80',
+    title: 'State-of-the-Art Diagnostics Lab',
+    desc: 'Our center is equipped with advanced testing jigs and professional ESD protection tools.'
+  },
+  {
+    id: 'slide-2',
+    image: 'https://images.unsplash.com/photo-1597740985671-2a8a3b80f02e?auto=format&fit=crop&w=1200&q=80',
+    title: 'Certified Micro-Soldering Repairs',
+    desc: 'Specialist repair of complex motherboard chips, BGA chipsets, and charging boards.'
+  },
+  {
+    id: 'slide-3',
+    image: 'https://images.unsplash.com/photo-1588508065123-287b28e013da?auto=format&fit=crop&w=1200&q=80',
+    title: 'Genuine Motorola & Laptop Parts',
+    desc: 'We stock original displays, high-capacity batteries, keyboards, and components.'
+  },
+  {
+    id: 'slide-4',
+    image: 'https://images.unsplash.com/photo-1620288627223-53302f4e8c74?auto=format&fit=crop&w=1200&q=80',
+    title: 'Reliance resQ Certified Partnership',
+    desc: 'Authorized brand service support with nationwide warranty validation.'
+  }
+];
+
+const API_BASE = import.meta.env.VITE_API_URL;
+
+function Slideshow({ slides, onUploadSlide }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const fileInputRef = React.useRef(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % slides.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [slides.length]);
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + slides.length) % slides.length);
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % slides.length);
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const title = window.prompt("Enter a Title for your photo:", "Service Center Workstation");
+      const desc = window.prompt("Enter a Description/Caption:", "Technician performing diagnostics and repairs.");
+
+      const newSlide = {
+        id: `uploaded-${Date.now()}`,
+        image: event.target.result,
+        title: title || "Service Center Upload",
+        desc: desc || "Uploaded photo of our service workstation."
+      };
+
+      onUploadSlide(newSlide);
+      setCurrentIndex(slides.length); // Switch to the newly uploaded slide
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="slideshow-container container">
+      <button className="upload-overlay-trigger" onClick={handleUploadClick}>
+        <Smartphone size={14} /> Upload Your Repair Exprience
+      </button>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+        accept="image/*"
+      />
+
+      {slides.map((slide, idx) => (
+        <div key={slide.id} className={`slide-item ${idx === currentIndex ? 'active' : ''}`}>
+          <img src={slide.image} alt={slide.title} className="slide-image" />
+          <div className="slide-overlay">
+            <h3 className="slide-title">{slide.title}</h3>
+            <p className="slide-desc">{slide.desc}</p>
+          </div>
+        </div>
+      ))}
+
+      <button className="slideshow-arrow left" onClick={handlePrev} aria-label="Previous Slide">
+        <ChevronLeft size={20} />
+      </button>
+      <button className="slideshow-arrow right" onClick={handleNext} aria-label="Next Slide">
+        <ChevronRight size={20} />
+      </button>
+
+      <div className="slideshow-dots">
+        {slides.map((_, idx) => (
+          <button
+            key={idx}
+            className={`slideshow-dot ${idx === currentIndex ? 'active' : ''}`}
+            onClick={() => setCurrentIndex(idx)}
+            aria-label={`Go to slide ${idx + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [activeTab, setActiveTab] = useState(() => {
     return window.location.pathname === '/admin' ? 'admin' : 'home';
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState(null);
+
+  const [slides, setSlides] = useState(() => {
+    const saved = localStorage.getItem('motolap_slides');
+    return saved ? JSON.parse(saved) : DEFAULT_SLIDES;
+  });
+
+  const handleUploadSlide = (newSlide) => {
+    const updated = [...slides, newSlide];
+    setSlides(updated);
+    localStorage.setItem('motolap_slides', JSON.stringify(updated));
+  };
 
   // Scroll to top on page change
   useEffect(() => {
@@ -98,48 +248,53 @@ function App() {
       {/* Header / Navbar */}
       <header className="navbar">
         <div className="container nav-container">
-          <div className="logo" onClick={() => setActiveTab('home')} style={{ cursor: 'pointer' }}>
+          <div className="logo" onClick={() => setActiveTab('home')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <MotorolaLogo size={28} style={{ color: 'var(--color-moto)', flexShrink: 0 }} />
-            <span>Motorola Service Center</span>
+            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: '800', lineHeight: '1.1' }}>Motorola Service Center</span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                Affiliated with <RelianceResqLogo size={9} />
+              </span>
+            </div>
           </div>
 
           <nav>
             <ul className="nav-menu">
               <li>
-                <span 
-                  className={`nav-link ${activeTab === 'home' ? 'active' : ''}`} 
+                <span
+                  className={`nav-link ${activeTab === 'home' ? 'active' : ''}`}
                   onClick={() => setActiveTab('home')}
                 >
                   Home
                 </span>
               </li>
               <li>
-                <span 
-                  className={`nav-link ${activeTab === 'services' ? 'active' : ''}`} 
+                <span
+                  className={`nav-link ${activeTab === 'services' ? 'active' : ''}`}
                   onClick={() => setActiveTab('services')}
                 >
                   Services
                 </span>
               </li>
               <li>
-                <span 
-                  className={`nav-link ${activeTab === 'book' ? 'active' : ''}`} 
+                <span
+                  className={`nav-link ${activeTab === 'book' ? 'active' : ''}`}
                   onClick={() => setActiveTab('book')}
                 >
                   Book Repair
                 </span>
               </li>
               <li>
-                <span 
-                  className={`nav-link ${activeTab === 'track' ? 'active' : ''}`} 
+                <span
+                  className={`nav-link ${activeTab === 'track' ? 'active' : ''}`}
                   onClick={() => setActiveTab('track')}
                 >
                   Track Status
                 </span>
               </li>
               <li>
-                <span 
-                  className={`nav-link ${activeTab === 'contact' ? 'active' : ''}`} 
+                <span
+                  className={`nav-link ${activeTab === 'contact' ? 'active' : ''}`}
                   onClick={() => setActiveTab('contact')}
                 >
                   Contact
@@ -153,8 +308,8 @@ function App() {
 
       {/* Main Pages */}
       <main style={{ minHeight: '80vh' }}>
-        {activeTab === 'home' && <HomeView setActiveTab={setActiveTab} />}
-        {activeTab === 'services' && <ServicesView setActiveTab={setActiveTab} />}
+        {activeTab === 'home' && <HomeView setActiveTab={setActiveTab} slides={slides} onUploadSlide={handleUploadSlide} setSelectedBrand={setSelectedBrand} />}
+        {activeTab === 'services' && <ServicesView setActiveTab={setActiveTab} selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />}
         {activeTab === 'book' && <BookRepairView />}
         {activeTab === 'track' && <TrackStatusView />}
         {activeTab === 'contact' && <ContactView />}
@@ -163,10 +318,10 @@ function App() {
 
       {/* Quick Mobile Action Floating Buttons */}
       <div className="quick-contact-bar">
-        <a href="https://wa.me/919876543210?text=Hi%2C%20I%20want%20to%20inquire%20about%20a%20repair." target="_blank" rel="noopener noreferrer" className="contact-bubble whatsapp" aria-label="WhatsApp Inquiry">
+        <a href="https://wa.me/918795427739?text=Hi%2C%20I%20want%20to%20inquire%20about%20a%20repair." target="_blank" rel="noopener noreferrer" className="contact-bubble whatsapp" aria-label="WhatsApp Inquiry">
           <MessageSquare />
         </a>
-        <a href="tel:+919876543210" className="contact-bubble call" aria-label="Call Service Center">
+        <a href="tel:+918795427739" className="contact-bubble call" aria-label="Call Service Center">
           <Phone />
         </a>
       </div>
@@ -194,12 +349,16 @@ function App() {
       {/* Footer */}
       <footer className="footer">
         <div className="container">
-          <div className="footer-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <div className="footer-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <MotorolaLogo size={22} style={{ color: 'var(--color-moto)' }} />
             <span>Motorola Service Center</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '500' }}>|</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              Authorized Service Affiliate: <RelianceResqLogo size={10} />
+            </span>
           </div>
           <p style={{ marginBottom: '16px', fontSize: '0.8rem' }}>
-            Official Motorola Mobile Specialists & Premium Laptop Service Experts (Dell, HP, Asus).
+            Official Motorola Mobile Specialists & Premium Laptop Service Experts (Dell, HP, Asus) in affiliation with Reliance resQ.
           </p>
           <div className="footer-links">
             <span className="footer-link" onClick={() => setActiveTab('home')} style={{ cursor: 'pointer' }}>Home</span>
@@ -208,7 +367,7 @@ function App() {
             <span className="footer-link" onClick={() => setActiveTab('track')} style={{ cursor: 'pointer' }}>Track Status</span>
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-            &copy; {new Date().getFullYear()} Motorola Service Center. All rights reserved. All brand logos are property of their respective owners.
+            &copy; {new Date().getFullYear()} Charom Enterprises All rights reserved. All brand logos are property of their respective owners.
           </p>
         </div>
       </footer>
@@ -219,18 +378,22 @@ function App() {
 /* ==========================================================================
    1. HOME VIEW
    ========================================================================== */
-function HomeView({ setActiveTab }) {
+function HomeView({ setActiveTab, slides, onUploadSlide, setSelectedBrand }) {
   return (
     <div>
       {/* Hero Section */}
       <section className="hero container">
-        <span className="hero-subtitle">Premium Repair Center</span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#ffffff', border: '1px solid var(--border-color)', padding: '6px 14px', borderRadius: '30px', marginBottom: '16px', boxShadow: 'var(--shadow-sm)' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-secondary)' }}>OFFICIAL SERVICE AFFILIATE</span>
+          <span style={{ height: '14px', width: '1px', background: 'var(--border-color)' }}></span>
+          <RelianceResqLogo size={12} />
+        </div>
         <h1 className="hero-title">
           Specialist Care For <br />
           <span className="gradient-text">Motorola & Laptops</span>
         </h1>
         <p className="hero-desc">
-          Certified Motorola mobile repair specialists and dedicated engineers for Dell, HP, and Asus laptops. Get your devices fixed fast with genuine parts and a warranty.
+          Certified Motorola mobile repair specialists and dedicated engineers for Dell, HP, and Asus laptops. Supported by state-of-the-art diagnostic testing and certified engineers.
         </p>
         <div className="hero-ctas">
           <button className="btn btn-primary" onClick={() => setActiveTab('book')}>
@@ -242,6 +405,9 @@ function HomeView({ setActiveTab }) {
         </div>
       </section>
 
+      {/* Picture Slideshow */}
+      <Slideshow slides={slides} onUploadSlide={onUploadSlide} />
+
       {/* Brands Selection Section */}
       <section className="section container" style={{ paddingTop: '20px' }}>
         <div className="section-header">
@@ -252,88 +418,51 @@ function HomeView({ setActiveTab }) {
         </div>
 
         <div className="brands-grid">
-          {/* Motorola Card */}
-          <div className="brand-card motorola" onClick={() => setActiveTab('services')}>
-            <div>
-              <span className="brand-badge moto-badge">Specialist</span>
-              <div className="brand-logo-placeholder" style={{ color: 'var(--color-moto)', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
-                <MotorolaLogo size={52} />
+          {servicesData.map((brand) => {
+            const LogoComponent = LogoComponents[brand.logoType];
+            return (
+              <div
+                key={brand.id}
+                className={`brand-card ${brand.id}`}
+                onClick={() => {
+                  setSelectedBrand(brand.id);
+                  setActiveTab('services');
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                <div>
+                  <span className={`brand-badge ${brand.badgeClass}`}>{brand.badgeText}</span>
+                  <div className="brand-logo-placeholder" style={{ color: brand.accentColor, display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
+                    {LogoComponent ? <LogoComponent size={52} /> : null}
+                  </div>
+                  <p className="brand-desc">{brand.desc}</p>
+                </div>
+                <ul className="brand-features">
+                  {brand.features.map((feat, idx) => (
+                    <li key={idx}><Check /> {feat}</li>
+                  ))}
+                </ul>
+                <button
+                  className="btn btn-secondary btn-block"
+                  style={{ fontSize: '0.8rem', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: 'auto' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBrand(brand.id);
+                    setActiveTab('services');
+                  }}
+                >
+                  See More <ChevronRight size={14} />
+                </button>
               </div>
-              <p className="brand-desc">Only Mobile Brand We Service. Certified Experts for Razr, Edge, and G Series.</p>
-            </div>
-            <ul className="brand-features">
-              <li><Check /> Genuine Motorola Parts</li>
-              <li><Check /> Edge & Razr Display Repair</li>
-              <li><Check /> Battery & Power Diagnosis</li>
-            </ul>
-            <button className="btn btn-secondary btn-block" style={{ fontSize: '0.8rem', padding: '8px' }}>
-              View Motorola Services
-            </button>
-          </div>
-
-          {/* Dell Card */}
-          <div className="brand-card dell" onClick={() => setActiveTab('services')}>
-            <div>
-              <span className="brand-badge laptop-badge">Laptop Care</span>
-              <div className="brand-logo-placeholder" style={{ color: 'var(--color-dell)', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
-                <DellLogo size={52} />
-              </div>
-              <p className="brand-desc">Complete Support for Inspiron, XPS, Latitude, Vostro, and G-Series.</p>
-            </div>
-            <ul className="brand-features">
-              <li><Check /> Motherboard Chipset repair</li>
-              <li><Check /> Battery & Keyboard swap</li>
-              <li><Check /> SSD & RAM Upgrades</li>
-            </ul>
-            <button className="btn btn-secondary btn-block" style={{ fontSize: '0.8rem', padding: '8px' }}>
-              View Dell Services
-            </button>
-          </div>
-
-          {/* HP Card */}
-          <div className="brand-card hp" onClick={() => setActiveTab('services')}>
-            <div>
-              <span className="brand-badge laptop-badge">Laptop Care</span>
-              <div className="brand-logo-placeholder" style={{ color: 'var(--color-hp)', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
-                <HpLogo size={52} />
-              </div>
-              <p className="brand-desc">Expert Repair for Pavilion, Envy, Spectre, EliteBook, and Omen.</p>
-            </div>
-            <ul className="brand-features">
-              <li><Check /> Screen Glass Replacement</li>
-              <li><Check /> Hinge & Panel Restoration</li>
-              <li><Check /> Fan & Thermal Overhaul</li>
-            </ul>
-            <button className="btn btn-secondary btn-block" style={{ fontSize: '0.8rem', padding: '8px' }}>
-              View HP Services
-            </button>
-          </div>
-
-          {/* Asus Card */}
-          <div className="brand-card asus" onClick={() => setActiveTab('services')}>
-            <div>
-              <span className="brand-badge laptop-badge">Laptop Care</span>
-              <div className="brand-logo-placeholder" style={{ color: 'var(--color-asus)', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px' }}>
-                <AsusLogo size={52} />
-              </div>
-              <p className="brand-desc">Specialized Diagnostics for ZenBook, VivoBook, ROG, and TUF Gaming.</p>
-            </div>
-            <ul className="brand-features">
-              <li><Check /> Liquid Damage Recovery</li>
-              <li><Check /> GPU/CPU Repasting</li>
-              <li><Check /> BIOS & OS Troubleshooting</li>
-            </ul>
-            <button className="btn btn-secondary btn-block" style={{ fontSize: '0.8rem', padding: '8px' }}>
-              View Asus Services
-            </button>
-          </div>
+            );
+          })}
         </div>
       </section>
 
       {/* Professional Features Section */}
       <section className="section container" style={{ background: 'rgba(255, 255, 255, 0.01)', borderRadius: '24px', border: '1px solid var(--border-color)', margin: '40px auto' }}>
         <div className="section-header">
-          <h2 className="section-title">Why Choose MotoLap Care?</h2>
+          <h2 className="section-title">Why Choose Charom Enterprises?</h2>
           <p className="section-desc">We make repairing your devices fast, transparent, and completely stress-free.</p>
         </div>
 
@@ -363,6 +492,41 @@ function HomeView({ setActiveTab }) {
           </div>
         </div>
       </section>
+
+      {/* Reliance resQ Affiliation Section */}
+      <section className="section container" style={{ background: '#ffffff', borderRadius: '24px', border: '1px solid var(--border-color)', margin: '40px auto', padding: '40px', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '40px', alignItems: 'center' }}>
+          <div style={{ flex: '1 1 350px', textAlign: 'left' }}>
+            <div style={{ display: 'inline-block', padding: '4px 12px', background: 'rgba(225, 29, 72, 0.1)', color: 'var(--color-resq)', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', marginBottom: '16px' }}>
+              Strategic Affiliation
+            </div>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '16px', lineHeight: '1.2' }}>
+              Powered by Reliance resQ
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '0.95rem' }}>
+              As an authorized affiliate of <strong>Reliance resQ</strong>, we deliver certified service standards. This strategic partnership brings state-of-the-art diagnostic protocols, manufacturer-approved testing equipment, and nationwide service assurance right to Noida.
+            </p>
+            <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                <CheckCircle size={16} style={{ color: '#10b981', flexShrink: 0 }} /> Nationwide Warranty Validation across all Reliance resQ networks.
+              </li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                <CheckCircle size={16} style={{ color: '#10b981', flexShrink: 0 }} /> Technicians trained and certified by OEM partners and resQ labs.
+              </li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                <CheckCircle size={16} style={{ color: '#10b981', flexShrink: 0 }} /> Direct integration with Reliance Digital service support.
+              </li>
+            </ul>
+          </div>
+          <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '30px', background: '#f8fafc', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '1px' }}>Authorized Service Platform</span>
+            <RelianceResqLogo size={36} />
+            <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Verified Partner Portal ID: <strong>RESQ-MOTO-9382</strong>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -370,76 +534,108 @@ function HomeView({ setActiveTab }) {
 /* ==========================================================================
    2. SERVICES VIEW
    ========================================================================== */
-function ServicesView({ setActiveTab }) {
+function ServicesView({ setActiveTab, selectedBrand, setSelectedBrand }) {
+  useEffect(() => {
+    if (selectedBrand) {
+      const element = document.getElementById(`service-card-${selectedBrand}`);
+      if (element) {
+        const timer = setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setSelectedBrand(null);
+        }, 150);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [selectedBrand, setSelectedBrand]);
+
   return (
     <div className="container section">
       <div className="section-header">
         <h2 className="section-title">Our Specialized Services</h2>
-        <p className="section-desc">Clear pricing, genuine components, and expert workmanship for every device.</p>
+        <p className="section-desc">Certified support, genuine components, and expert workmanship for every device.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px', margin: '40px 0' }}>
-        {/* Mobile Section */}
-        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '24px', padding: '30px', textAlign: 'left' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <div style={{ width: '40px', height: '40px', background: 'rgba(0, 229, 255, 0.1)', color: 'var(--color-moto)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifycontent: 'center' }}>
-              <Smartphone />
-            </div>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: '700' }}>Motorola Mobile Repairs</h3>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '0.9rem' }}>
-            As a specialized Motorola service center, we deal exclusively in Motorola devices. We have the specific calibration jigs for Motorola Edge and Razr folding models.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span>Motorola Original Screen Assembly (Edge, Razr, G, Moto G Stylus)</span>
-              <strong style={{ color: 'var(--color-moto)' }}>Starts from $49</strong>
-            </div>
-            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span>Genuine Motorola Battery Swap (Long-life replacement)</span>
-              <strong style={{ color: 'var(--color-moto)' }}>Starts from $29</strong>
-            </div>
-            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span>USB-C Charging Port & Mic Board Replacement</span>
-              <strong style={{ color: 'var(--color-moto)' }}>Starts from $19</strong>
-            </div>
-            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span>Water Damage Ultrasonic Cleaning & Board Repair</span>
-              <strong style={{ color: 'var(--color-moto)' }}>Diagnosis Free</strong>
-            </div>
-          </div>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '40px', margin: '40px 0' }}>
+        {servicesData.map((brand) => {
+          const LogoComponent = LogoComponents[brand.logoType];
+          return (
+            <div
+              key={brand.id}
+              id={`service-card-${brand.id}`}
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '24px',
+                padding: '35px',
+                textAlign: 'left',
+                boxShadow: 'var(--shadow-sm)',
+                scrollMarginTop: '90px',
+                transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
+              }}
+              className="service-brand-detail-card"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  background: 'rgba(2, 132, 199, 0.08)',
+                  color: brand.accentColor,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '12px'
+                }}>
+                  {brand.type === 'mobile' ? <Smartphone size={24} /> : <Laptop size={24} />}
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0 }}>
+                    {brand.name} Services
+                  </h3>
+                  <span className={`brand-badge ${brand.badgeClass}`} style={{ marginTop: '4px', display: 'inline-block' }}>
+                    {brand.badgeText}
+                  </span>
+                </div>
+                <div style={{ marginLeft: 'auto', color: brand.accentColor }}>
+                  {LogoComponent ? <LogoComponent size={40} /> : null}
+                </div>
+              </div>
 
-        {/* Laptop Section */}
-        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '24px', padding: '30px', textAlign: 'left' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <div style={{ width: '40px', height: '40px', background: 'rgba(255, 255, 255, 0.05)', color: 'white', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Laptop />
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '25px', fontSize: '0.95rem', lineHeight: '1.6' }}>
+                {brand.desc} Dedicated tooling, OEM test setups, and diagnostic software are used for all {brand.name} repairs.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+                {brand.services.map((service, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      borderBottom: '1px solid var(--border-color)',
+                      paddingBottom: '16px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                      fontSize: '0.95rem'
+                    }}
+                  >
+                    <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>{service.name}</span>
+                    <strong style={{
+                      color: service.tagType === 'success' ? '#059669' : 'var(--color-moto)',
+                      background: service.tagType === 'success' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(2, 132, 199, 0.08)',
+                      padding: '6px 12px',
+                      borderRadius: '30px',
+                      fontSize: '0.75rem',
+                      fontWeight: '700'
+                    }}>
+                      {service.tag}
+                    </strong>
+                  </div>
+                ))}
+              </div>
             </div>
-            <h3 style={{ fontSize: '1.4rem', fontWeight: '700' }}>Dell, HP, Asus Laptop Services</h3>
-          </div>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '20px', fontSize: '0.9rem' }}>
-            Our repair workshop is equipped with high-precision BGA rework stations. We fix keyboard keys, cracked screens, loose hinges, broken charging ports, and short-circuited motherboards.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span>High-Definition Laptop Display Replacement (IPS, OLED, 144Hz)</span>
-              <strong style={{ color: 'var(--color-dell)' }}>Starts from $79</strong>
-            </div>
-            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span>Motherboard IC Chip-level Repair (No Boot, Dead Board)</span>
-              <strong style={{ color: 'var(--color-hp)' }}>Starts from $99</strong>
-            </div>
-            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span>Speed Upgrade (High-Speed NVMe SSD + 16GB/32GB DDR4/DDR5 RAM)</span>
-              <strong style={{ color: 'var(--color-asus)' }}>Starts from $45</strong>
-            </div>
-            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-              <span>Premium Keyboard & Mousepad Assembly Replacement</span>
-              <strong style={{ color: 'white' }}>Starts from $39</strong>
-            </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       <div style={{ textAlign: 'center', marginTop: '30px' }}>
@@ -465,7 +661,7 @@ function BookRepairView() {
     customer_phone: '',
     service_type: 'Walk-in' // Default
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successData, setSuccessData] = useState(null);
@@ -541,7 +737,7 @@ function BookRepairView() {
         {step < 4 && (
           <div className="form-header">
             <h2 style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '8px' }}>Book a Repair</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Get your quote and repair ticket instantly.</p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Register your device and get your repair ticket instantly.</p>
           </div>
         )}
 
@@ -599,7 +795,7 @@ function BookRepairView() {
         {step === 2 && (
           <div>
             <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '16px', textAlign: 'left' }}>Step 2: Device & Issue Details ({formData.brand})</h3>
-            
+
             <div className="form-group">
               <label className="form-label" htmlFor="device_model">Device Model Name</label>
               <input
@@ -814,7 +1010,7 @@ function TrackStatusView() {
           <input
             type="text"
             className="form-input"
-            placeholder="e.g. MOTO-8302 or 9876543210"
+            placeholder="e.g. MOTO-8302 or 8795427739"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             required
@@ -845,7 +1041,7 @@ function TrackStatusView() {
               const currentStepIdx = getStepIndex(repair.status);
               return (
                 <div key={repair.id} style={{ borderBottom: results.length > 1 ? '1px solid var(--border-color)' : 'none', paddingBottom: results.length > 1 ? '40px' : '0', marginBottom: results.length > 1 ? '40px' : '0' }}>
-                  
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
                     <div style={{ textAlign: 'left' }}>
                       <span className={`badge badge-${repair.status.replace(/\s+/g, '-')}`} style={{ marginBottom: '8px' }}>
@@ -949,7 +1145,7 @@ function ContactView() {
     <div className="container section">
       <div className="section-header">
         <h2 className="section-title">Contact Us</h2>
-        <p className="section-desc">Reach out for custom laptop quotes, business contracts, or urgent repair questions.</p>
+        <p className="section-desc">Reach out for custom service configurations, business contracts, or urgent repair questions.</p>
       </div>
 
       <div className="contact-layout">
@@ -957,7 +1153,7 @@ function ContactView() {
         <div className="contact-info-card">
           <div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '24px' }}>Get in Touch</h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div className="contact-method">
                 <div className="contact-method-icon">
@@ -965,7 +1161,7 @@ function ContactView() {
                 </div>
                 <div>
                   <div className="contact-method-title">Call Us Directly</div>
-                  <div className="contact-method-detail">+91 98765 43210 / +91 98765 43211</div>
+                  <div className="contact-method-detail">+91 7458976787 / +91 8795427739</div>
                 </div>
               </div>
 
@@ -975,8 +1171,16 @@ function ContactView() {
                 </div>
                 <div>
                   <div className="contact-method-title">Email Enquiries</div>
-                  <div className="contact-method-detail">support@motolapcare.com / info@motolapcare.com</div>
+                  <a
+                    className="contact-method-detail"
+                    href="https://google.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    charom.ayodhya.ram@gmail.com
+                  </a>
                 </div>
+
               </div>
 
               <div className="contact-method">
@@ -986,7 +1190,7 @@ function ContactView() {
                 <div>
                   <div className="contact-method-title">Visit Our Center</div>
                   <div className="contact-method-detail">
-                    Shop 102, 1st Floor, Tech Plaza Complex, Sector 18, Noida, Uttar Pradesh, 201301
+                    Basment floor, gata, Axis bank Charom Enterprises, 55, Raibareli Rd, Naka, Usroo, Faizabad, Uttar Pradesh 224001
                   </div>
                 </div>
               </div>
@@ -1003,8 +1207,19 @@ function ContactView() {
           </div>
 
           <div className="map-placeholder">
-            <span>[Interactive Map Location Sector 18 Noida]</span>
+            <span>
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d57002.76682322846!2d82.05812624863282!3d26.754811599999993!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x399a09004e0f875f%3A0x86f5cbb5479c67e4!2sMotorola%20Service%20Center%20By%20Charom%20Enterprises%20(Reliance%20ResQ)!5e0!3m2!1sen!2sin!4v1783755031895!5m2!1sen!2sin"
+                width="100%"
+                height="450"
+                style={{ border: 0 }}
+                allowFullScreen=""
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            </span>
           </div>
+
         </div>
 
         {/* Right Side: Message Form */}
@@ -1176,13 +1391,13 @@ function AdminView() {
 
   // Filter repairs locally
   const filteredRepairs = repairs.filter(repair => {
-    const matchesSearch = 
+    const matchesSearch =
       repair.ticket_id.toLowerCase().includes(searchFilter.toLowerCase()) ||
       repair.customer_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
       repair.customer_phone.includes(searchFilter);
     const matchesBrand = brandFilter ? repair.brand === brandFilter : true;
     const matchesStatus = statusFilter ? repair.status === statusFilter : true;
-    
+
     return matchesSearch && matchesBrand && matchesStatus;
   });
 
