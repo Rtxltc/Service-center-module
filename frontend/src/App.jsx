@@ -1046,13 +1046,10 @@ function TrackStatusView({ setHideCallBubble }) {
   const [results, setResults] = useState([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [cachedRepairsList, setCachedRepairsList] = useState([]);
+  const [activeDetailsModal, setActiveDetailsModal] = useState(null);
 
   const handleOpenExternal = (repair) => {
-    const deviceType = repair.brand.toLowerCase() === 'motorola' ? 'mobile' : 'laptop';
-    const brandLower = repair.brand.toLowerCase();
-    const url = `https://charom-resq.com/${deviceType}/${brandLower}/#${repair.ticket_id}`;
-    alert(`Greetings from Motorola & Laptop Service Center!\n\nWe are directing you to your device details on Charom ResQ.\nTicket ID: ${repair.ticket_id}`);
-    window.open(url, '_blank');
+    setActiveDetailsModal(repair);
   };
 
   useEffect(() => {
@@ -1309,6 +1306,84 @@ function TrackStatusView({ setHideCallBubble }) {
           </div>
         )}
       </div>
+
+      {activeDetailsModal && (
+        <div className="custom-modal-overlay" onClick={() => setActiveDetailsModal(null)}>
+          <div className="custom-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="custom-modal-header">
+              <h3 className="custom-modal-title">Repair Ticket Details</h3>
+              <button className="custom-modal-close-btn" onClick={() => setActiveDetailsModal(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="custom-modal-body">
+              <div className="custom-modal-greeting">Greetings from Motorola & Laptop Service Center!</div>
+              <p className="custom-modal-desc">
+                Below are the complete registered details for this service ticket. You can track its live progress or proceed to view it on the main network portal.
+              </p>
+              
+              <div className="custom-modal-details-grid">
+                <div className="custom-modal-detail-item">
+                  <span className="custom-modal-label">Ticket ID</span>
+                  <span className="custom-modal-value" style={{ color: 'var(--color-moto)' }}>{activeDetailsModal.ticket_id}</span>
+                </div>
+                <div className="custom-modal-detail-item">
+                  <span className="custom-modal-label">Current Status</span>
+                  <span className="custom-modal-value">
+                    <span className={`badge badge-${activeDetailsModal.status.replace(/\s+/g, '-')}`} style={{ display: 'inline-block', margin: 0 }}>
+                      {activeDetailsModal.status}
+                    </span>
+                  </span>
+                </div>
+                <div className="custom-modal-detail-item">
+                  <span className="custom-modal-label">Device Brand</span>
+                  <span className="custom-modal-value">{activeDetailsModal.brand}</span>
+                </div>
+                <div className="custom-modal-detail-item">
+                  <span className="custom-modal-label">Device Model</span>
+                  <span className="custom-modal-value">{activeDetailsModal.device_model}</span>
+                </div>
+                <div className="custom-modal-detail-item">
+                  <span className="custom-modal-label">Customer Name</span>
+                  <span className="custom-modal-value">{activeDetailsModal.customer_name}</span>
+                </div>
+                <div className="custom-modal-detail-item">
+                  <span className="custom-modal-label">Date Booked</span>
+                  <span className="custom-modal-value">{new Date(activeDetailsModal.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="custom-modal-detail-item">
+                  <span className="custom-modal-label">Service Preference</span>
+                  <span className="custom-modal-value">{activeDetailsModal.service_type}</span>
+                </div>
+                <div className="custom-modal-detail-item">
+                  <span className="custom-modal-label">Contact Phone</span>
+                  <span className="custom-modal-value">{activeDetailsModal.customer_phone}</span>
+                </div>
+                <div className="custom-modal-detail-item full-width">
+                  <span className="custom-modal-label">Reported Issue</span>
+                  <span className="custom-modal-value" style={{ fontWeight: 'normal', fontSize: '0.85rem' }}>{activeDetailsModal.issue_description}</span>
+                </div>
+              </div>
+            </div>
+            <div className="custom-modal-footer">
+              <button className="btn btn-secondary" onClick={() => setActiveDetailsModal(null)}>
+                Close
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => {
+                  const deviceType = activeDetailsModal.brand.toLowerCase() === 'motorola' ? 'mobile' : 'laptop';
+                  const brandLower = activeDetailsModal.brand.toLowerCase();
+                  const url = `https://charom-resq.com/${deviceType}/${brandLower}/#${activeDetailsModal.ticket_id}`;
+                  window.open(url, '_blank');
+                }}
+              >
+                Open on Charom ResQ <ExternalLink size={14} style={{ marginLeft: '4px', verticalAlign: 'middle' }} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
