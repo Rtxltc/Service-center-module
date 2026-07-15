@@ -237,7 +237,10 @@ function Slideshow({ slides, onUploadSlide }) {
 
 function App() {
   const [activeTab, setActiveTab] = useState(() => {
-    return window.location.pathname === '/admin' ? 'admin' : 'home';
+    if (window.location.pathname === '/admin') return 'admin';
+    const isDirectRoute = window.location.pathname.match(/^\/(mobile|laptop)\/([a-zA-Z0-9_-]+)\/?$/);
+    if (isDirectRoute) return 'track';
+    return 'home';
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState(null);
@@ -272,7 +275,12 @@ function App() {
       if (window.location.pathname === '/admin') {
         setActiveTab('admin');
       } else {
-        setActiveTab((prev) => prev === 'admin' ? 'home' : prev);
+        const isDirectRoute = window.location.pathname.match(/^\/(mobile|laptop)\/([a-zA-Z0-9_-]+)\/?$/);
+        if (isDirectRoute) {
+          setActiveTab('track');
+        } else {
+          setActiveTab((prev) => prev === 'admin' ? 'home' : prev);
+        }
       }
     };
     window.addEventListener('popstate', handleLocationChange);
@@ -285,8 +293,8 @@ function App() {
       if (window.location.pathname !== '/admin') {
         window.history.pushState(null, '', '/admin');
       }
-    } else {
-      if (window.location.pathname === '/admin') {
+    } else if (activeTab !== 'track') {
+      if (window.location.pathname !== '/') {
         window.history.pushState(null, '', '/');
       }
     }
@@ -1090,6 +1098,51 @@ function TrackStatusView({ setHideCallBubble }) {
     loadAndRefreshCache();
   }, [setHideCallBubble]);
 
+  useEffect(() => {
+    const checkDirectRoute = () => {
+      const isDirectRoute = window.location.pathname.match(/^\/(mobile|laptop)\/([a-zA-Z0-9_-]+)\/?$/);
+      const hash = window.location.hash;
+      if (isDirectRoute && hash) {
+        const ticketId = hash.replace(/^#/, '');
+        setSearchQuery(ticketId);
+        
+        // Trigger search immediately
+        setLoading(true);
+        setError('');
+        setResults([]);
+        setHasSearched(true);
+        fetch(`${API_BASE}/repairs/search?query=${encodeURIComponent(ticketId)}`)
+          .then(res => res.json())
+          .then(data => {
+            setResults(data);
+            setLoading(false);
+            if (Array.isArray(data) && data.length > 0) {
+              data.forEach(r => saveRepairToCache(r));
+              const updated = JSON.parse(localStorage.getItem('cachedRepairs') || '[]');
+              setCachedRepairsList(updated);
+              if (setHideCallBubble) {
+                const hasDelivered = updated.some(x => x.status.toLowerCase() === 'delivered');
+                setHideCallBubble(hasDelivered);
+              }
+            }
+          })
+          .catch(err => {
+            setError('Failed to fetch status');
+            setLoading(false);
+          });
+      }
+    };
+
+    checkDirectRoute();
+    
+    window.addEventListener('hashchange', checkDirectRoute);
+    window.addEventListener('popstate', checkDirectRoute);
+    return () => {
+      window.removeEventListener('hashchange', checkDirectRoute);
+      window.removeEventListener('popstate', checkDirectRoute);
+    };
+  }, [setHideCallBubble]);
+
   const handleSearch = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -1108,6 +1161,14 @@ function TrackStatusView({ setHideCallBubble }) {
 
       setResults(data);
       if (Array.isArray(data) && data.length > 0) {
+        const repair = data[0];
+        const deviceType = repair.brand.toLowerCase() === 'motorola' ? 'mobile' : 'laptop';
+        const brandLower = repair.brand.toLowerCase();
+        const newPath = `/${deviceType}/${brandLower}/#${repair.ticket_id}`;
+        if (window.location.pathname + window.location.hash !== newPath) {
+          window.history.pushState(null, '', newPath);
+        }
+
         data.forEach(repair => saveRepairToCache(repair));
         const updated = JSON.parse(localStorage.getItem('cachedRepairs') || '[]');
         setCachedRepairsList(updated);
@@ -1189,6 +1250,14 @@ function TrackStatusView({ setHideCallBubble }) {
                         setResults(data);
                         setLoading(false);
                         if (Array.isArray(data) && data.length > 0) {
+                          const rep = data[0];
+                          const deviceType = rep.brand.toLowerCase() === 'motorola' ? 'mobile' : 'laptop';
+                          const brandLower = rep.brand.toLowerCase();
+                          const newPath = `/${deviceType}/${brandLower}/#${rep.ticket_id}`;
+                          if (window.location.pathname + window.location.hash !== newPath) {
+                            window.history.pushState(null, '', newPath);
+                          }
+
                           data.forEach(r => saveRepairToCache(r));
                           const updated = JSON.parse(localStorage.getItem('cachedRepairs') || '[]');
                           setCachedRepairsList(updated);
