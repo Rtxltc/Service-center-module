@@ -64,13 +64,20 @@ const AcerLogo = ({ size = 24, style = {}, className = "" }) => (
     <text x="0" y="16" fontFamily="'Outfit', 'Inter', sans-serif" fontWeight="900" fontSize="18" letterSpacing="-0.5px">acer</text>
   </svg>
 );
+const LenovoLogo = ({ size = 24, style = {}, className = "" }) => (
+  <svg viewBox="0 0 1200 600" width={size * 3.2} height={size} fill="currentColor" style={{ ...style, display: 'inline-block' }} className={className} xmlns="http://www.w3.org/2000/svg">
+    <title>Lenovo</title>
+    <path d="M349.5 0l-75.1 186.6-69.4-186.6h64.5l20.9 54.2h129.2l20.9-54.2h65.2L349.5 0zm-11.6 72.8l21.6-54.2h31l-21.6 54.2h-31zm365.8 0v13.2c44.4-37.7 72.4-70.4 72.4-132.4 0-55.7-34.1-87-114.6-87h-91.5V0h65.1v50.6h67.4v13.7l-81.1 106.2zM405.1 187.3h104.2v48h-81.5v34.3h80.9v47.5h-80.9v48h-22.7v-130.1zM44.2 371.8c0 71 38.4 105.6 116.4 105.6 57.1 0 102-14.7 136.3-43l-28.9-48.5c-24 17.1-55 25.8-93.2 25.8-33.8 0-57.8-9-72.6-25.8v75.4zm744.6 0v11.3h122.3v24h-162.5v39h59.5v13.7h-59.5v38.3h102.7v13.3h-102.7v39h162.7v24h-162.7v11.3H788.8zM788.8 310h119v11.3h-119v-11.3z" />
+  </svg>
+);
 
 const LogoComponents = {
   MotorolaLogo,
   DellLogo,
   HpLogo,
   AsusLogo,
-  AcerLogo
+  AcerLogo,
+  LenovoLogo
 };
 
 const RelianceResqLogo = ({ size = 20, className = "" }) => (
