@@ -188,6 +188,44 @@ const servicesData = [
         tagType: "info"
       }
     ]
+  },
+  {
+    id: "lenovo",
+    name: "Lenovo",
+    type: "laptop",
+    subtitle: "Laptop Care",
+    desc: "Complete support for Ideapad, Thinkpad, Legion, Yoga, and Vibe series.",
+    badgeClass: "laptop-badge",
+    badgeText: "Laptop Care",
+    logoType: "LenovoLogo",
+    accentColor: "var(--color-lenovo)",
+    features: [
+      "Keyboard & Trackpad repair",
+      "Battery & Screen replacement",
+      "Performance tuning"
+    ],
+    services: [
+      {
+        name: "Lenovo Legion/IdeaPad Gaming High-Performance Cooling & Thermal Paste Service",
+        tag: "Advanced Cooling",
+        tagType: "success"
+      },
+      {
+        name: "Lenovo Thinkpad Ultra-Slim Display & Keyboard Assembly Replacement",
+        tag: "OEM Calibration",
+        tagType: "info"
+      },
+      {
+        name: "Lenovo Motherboard DC Jack & Power Circuit Micro-Soldering Repair",
+        tag: "Micro-Soldering Work",
+        tagType: "info"
+      },
+      {
+        name: "Genuine Lenovo Laptop Battery Replacement with 6-Month Warranty",
+        tag: "Safety Tested",
+        tagType: "info"
+      }
+    ]
   }
 ];
 
