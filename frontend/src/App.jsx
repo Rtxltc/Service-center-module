@@ -129,6 +129,18 @@ if (rawApiUrl && !rawApiUrl.endsWith('/api') && !rawApiUrl.endsWith('/api/')) {
 
 const API_BASE = rawApiUrl;
 
+const saveRepairToCache = (repair) => {
+  if (!repair || !repair.ticket_id) return;
+  try {
+    const cached = JSON.parse(localStorage.getItem('cachedRepairs') || '[]');
+    const filtered = cached.filter(item => item.ticket_id.toLowerCase() !== repair.ticket_id.toLowerCase());
+    const updated = [repair, ...filtered].slice(0, 10);
+    localStorage.setItem('cachedRepairs', JSON.stringify(updated));
+  } catch (e) {
+    console.error('Error saving to cache:', e);
+  }
+};
+
 function Slideshow({ slides, onUploadSlide }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const fileInputRef = React.useRef(null);
@@ -229,6 +241,14 @@ function App() {
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState(null);
+  const [hideCallBubble, setHideCallBubble] = useState(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem('cachedRepairs') || '[]');
+      return cached.some(r => r.status.toLowerCase() === 'delivered');
+    } catch (e) {
+      return false;
+    }
+  });
 
   const [slides, setSlides] = useState(() => {
     const saved = localStorage.getItem('motolap_slides');
@@ -341,7 +361,7 @@ function App() {
         {activeTab === 'home' && <HomeView setActiveTab={setActiveTab} slides={slides} onUploadSlide={handleUploadSlide} setSelectedBrand={setSelectedBrand} />}
         {activeTab === 'services' && <ServicesView setActiveTab={setActiveTab} selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />}
         {activeTab === 'book' && <BookRepairView />}
-        {activeTab === 'track' && <TrackStatusView />}
+        {activeTab === 'track' && <TrackStatusView setHideCallBubble={setHideCallBubble} />}
         {activeTab === 'contact' && <ContactView />}
         {activeTab === 'admin' && <AdminView />}
       </main>
@@ -351,9 +371,17 @@ function App() {
         <a href="https://wa.me/7458976787?text=Hi%2C%20I%20want%20to%20inquire%20about%20a%20repair." target="_blank" rel="noopener noreferrer" className="contact-bubble whatsapp" aria-label="WhatsApp Inquiry">
           <MessageSquare />
         </a>
+<<<<<<< HEAD
         <a href="tel:+7458976787" className="contact-bubble call" aria-label="Call Service Center">
           <Phone />
         </a>
+=======
+        {!hideCallBubble && (
+          <a href="tel:+7458976787" className="contact-bubble call" aria-label="Call Service Center">
+            <Phone />
+          </a>
+        )}
+>>>>>>> a9c9e73 (feat: add Lenovo support, implement repair status caching, and dynamically manage contact bubble visibility)
       </div>
 
       {/* Mobile Bottom Navigation (Native App Feel) */}
@@ -775,6 +803,7 @@ function BookRepairView() {
       }
 
       setSuccessData(data.repair);
+      saveRepairToCache(data.repair);
       setStep(4);
     } catch (err) {
       setError(err.message || 'Failed to submit repair request. Make sure the database is running.');
@@ -836,9 +865,19 @@ function BookRepairView() {
                 <AsusLogo size={28} style={{ display: 'block', margin: '0 auto 8px', color: formData.brand === 'Asus' ? 'var(--color-asus)' : 'var(--text-secondary)' }} />
                 Asus (Laptop)
               </div>
+              <div className={`brand-option-card ${formData.brand === 'Acer' ? 'selected' : ''}`} onClick={() => handleBrandSelect('Acer')}>
+                <AcerLogo size={28} style={{ display: 'block', margin: '0 auto 8px', color: formData.brand === 'Acer' ? 'var(--color-acer)' : 'var(--text-secondary)' }} />
+                Acer (Laptop)
+              </div>
+              <div className={`brand-option-card ${formData.brand === 'Lenovo' ? 'selected' : ''}`} onClick={() => handleBrandSelect('Lenovo')}>
+                <LenovoLogo size={28} style={{ display: 'block', margin: '0 auto 8px', color: formData.brand === 'Lenovo' ? 'var(--color-lenovo)' : 'var(--text-secondary)' }} />
+                Lenovo (Laptop)
+              </div>
             </div>
+
+           
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'left', marginTop: '12px' }}>
-              * We only repair Motorola mobiles. For laptops, we service Dell, HP, and Asus.
+              * We only repair Motorola mobiles. For laptops, we service Dell, HP, Asus, Acer, and Lenovo.
             </p>
           </div>
         )}
@@ -1006,15 +1045,62 @@ function BookRepairView() {
 /* ==========================================================================
    4. TRACK STATUS VIEW
    ========================================================================== */
-function TrackStatusView() {
+function TrackStatusView({ setHideCallBubble }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [cachedRepairsList, setCachedRepairsList] = useState([]);
+
+  const handleOpenExternal = (repair) => {
+    const deviceType = repair.brand.toLowerCase() === 'motorola' ? 'mobile' : 'laptop';
+    const brandLower = repair.brand.toLowerCase();
+    const url = `https://charom-resq.com/${deviceType}/${brandLower}/#${repair.ticket_id}`;
+    alert(`Greetings from Motorola & Laptop Service Center!\n\nWe are directing you to your device details on Charom ResQ.\nTicket ID: ${repair.ticket_id}`);
+    window.open(url, '_blank');
+  };
+
+  useEffect(() => {
+    const loadAndRefreshCache = async () => {
+      try {
+        const cached = JSON.parse(localStorage.getItem('cachedRepairs') || '[]');
+        if (cached.length === 0) return;
+
+        setCachedRepairsList(cached);
+
+        const updated = await Promise.all(
+          cached.map(async (item) => {
+            try {
+              const response = await fetch(`${API_BASE}/repairs/${item.ticket_id}`);
+              if (response.ok) {
+                const updatedRepair = await response.json();
+                return updatedRepair;
+              }
+            } catch (e) {
+              console.error(e);
+            }
+            return item;
+          })
+        );
+
+        localStorage.setItem('cachedRepairs', JSON.stringify(updated));
+        setCachedRepairsList(updated);
+
+        if (setHideCallBubble) {
+          const hasDelivered = updated.some(r => r.status.toLowerCase() === 'delivered');
+          setHideCallBubble(hasDelivered);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    loadAndRefreshCache();
+  }, [setHideCallBubble]);
 
   const handleSearch = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!searchQuery.trim()) return;
 
     setLoading(true);
@@ -1030,6 +1116,15 @@ function TrackStatusView() {
       }
 
       setResults(data);
+      if (Array.isArray(data) && data.length > 0) {
+        data.forEach(repair => saveRepairToCache(repair));
+        const updated = JSON.parse(localStorage.getItem('cachedRepairs') || '[]');
+        setCachedRepairsList(updated);
+        if (setHideCallBubble) {
+          const hasDelivered = updated.some(r => r.status.toLowerCase() === 'delivered');
+          setHideCallBubble(hasDelivered);
+        }
+      }
     } catch (err) {
       setError(err.message || 'Error occurred. Please verify your connection.');
     } finally {
@@ -1073,6 +1168,75 @@ function TrackStatusView() {
           </button>
         </form>
 
+        {/* Cached / Recently Tracked Repairs Section */}
+        {cachedRepairsList.length > 0 && !hasSearched && (
+          <div style={{ marginTop: '24px', textAlign: 'left' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: '700', marginBottom: '12px' }}>Your Recently Tracked Devices</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+              {cachedRepairsList.map((repair) => (
+                <div
+                  key={repair.ticket_id}
+                  style={{
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    padding: '14px 18px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    cursor: 'pointer'
+                  }}
+                  className="recent-track-card"
+                  onClick={() => {
+                    setSearchQuery(repair.ticket_id);
+                    setLoading(true);
+                    setError('');
+                    setHasSearched(true);
+                    fetch(`${API_BASE}/repairs/search?query=${encodeURIComponent(repair.ticket_id)}`)
+                      .then(res => res.json())
+                      .then(data => {
+                        setResults(data);
+                        setLoading(false);
+                        if (Array.isArray(data) && data.length > 0) {
+                          data.forEach(r => saveRepairToCache(r));
+                          const updated = JSON.parse(localStorage.getItem('cachedRepairs') || '[]');
+                          setCachedRepairsList(updated);
+                          if (setHideCallBubble) {
+                            const hasDelivered = updated.some(x => x.status.toLowerCase() === 'delivered');
+                            setHideCallBubble(hasDelivered);
+                          }
+                        }
+                      })
+                      .catch(err => {
+                        setError('Failed to fetch status');
+                        setLoading(false);
+                      });
+                  }}
+                >
+                  <div>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: '700', margin: 0 }}>{repair.brand} {repair.device_model}</h4>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                      Ticket ID:{' '}
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenExternal(repair);
+                        }}
+                        style={{ color: 'var(--color-moto)', textDecoration: 'underline', fontWeight: 'bold' }}
+                      >
+                        {repair.ticket_id} <ExternalLink size={10} style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+                      </span>
+                    </p>
+                  </div>
+                  <span className={`badge badge-${repair.status.replace(/\s+/g, '-')}`}>
+                    {repair.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {error && (
           <div style={{ display: 'flex', gap: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '12px 16px', borderRadius: '8px', color: '#f87171', fontSize: '0.85rem', margin: '20px 0', alignItems: 'center', textAlign: 'left' }}>
             <AlertCircle size={18} />
@@ -1100,7 +1264,16 @@ function TrackStatusView() {
                         {repair.status}
                       </span>
                       <h4 style={{ fontSize: '1.2rem', fontWeight: '800' }}>{repair.brand} {repair.device_model}</h4>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Ticket ID: {repair.ticket_id}</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        Ticket ID:{' '}
+                        <span
+                          onClick={() => handleOpenExternal(repair)}
+                          style={{ cursor: 'pointer', color: 'var(--color-moto)', textDecoration: 'underline', fontWeight: 'bold' }}
+                          title="Open details in new page"
+                        >
+                          {repair.ticket_id} <ExternalLink size={10} style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+                        </span>
+                      </p>
                     </div>
                     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.75rem', textAlign: 'right' }}>
                       <div>Date Booked: {new Date(repair.created_at).toLocaleDateString()}</div>

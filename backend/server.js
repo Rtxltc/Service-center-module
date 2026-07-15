@@ -60,9 +60,9 @@ app.post('/api/repairs', async (req, res) => {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
-  const validBrands = ['Motorola', 'Dell', 'HP', 'Asus', 'Acer'];
+  const validBrands = ['Motorola', 'Dell', 'HP', 'Asus', 'Acer', 'Lenovo'];
   if (!validBrands.includes(brand)) {
-    return res.status(400).json({ error: 'Invalid brand. Must be Motorola, Dell, HP, Asus, or Acer' });
+    return res.status(400).json({ error: 'Invalid brand. Must be Motorola, Dell, HP, Asus, Acer, or Lenovo' });
   }
 
   try {

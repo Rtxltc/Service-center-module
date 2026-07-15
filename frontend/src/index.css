@@ -14,6 +14,7 @@
   --color-hp: #0096d6;         /* HP Blue */
   --color-asus: #00539b;       /* Asus Blue */
   --color-acer: #83b81a;       /* Acer Green */
+  --color-lenovo: #e2231a;     /* Lenovo Red */
   --color-resq: #e11d48;        /* Reliance Red */
   
   --text-primary: #0f172a;      /* Dark Slate */
@@ -482,6 +483,8 @@ a {
 .brand-card.dell .brand-features li svg { color: var(--color-dell); }
 .brand-card.hp .brand-features li svg { color: var(--color-hp); }
 .brand-card.asus .brand-features li svg { color: var(--color-asus); }
+.brand-card.acer .brand-features li svg { color: var(--color-acer); }
+.brand-card.lenovo .brand-features li svg { color: var(--color-lenovo); }
 
 /* Quick Floating Contacts */
 .quick-contact-bar {
@@ -1320,4 +1323,15 @@ textarea.form-input {
 .upload-overlay-trigger:hover {
   background: #ffffff;
   color: var(--color-moto);
+}
+
+.recent-track-card {
+  transition: all var(--transition-fast);
+}
+
+.recent-track-card:hover {
+  border-color: var(--color-moto) !important;
+  background-color: var(--bg-card-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
