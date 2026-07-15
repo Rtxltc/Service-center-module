@@ -371,17 +371,11 @@ function App() {
         <a href="https://wa.me/7458976787?text=Hi%2C%20I%20want%20to%20inquire%20about%20a%20repair." target="_blank" rel="noopener noreferrer" className="contact-bubble whatsapp" aria-label="WhatsApp Inquiry">
           <MessageSquare />
         </a>
-<<<<<<< HEAD
-        <a href="tel:+7458976787" className="contact-bubble call" aria-label="Call Service Center">
-          <Phone />
-        </a>
-=======
         {!hideCallBubble && (
           <a href="tel:+7458976787" className="contact-bubble call" aria-label="Call Service Center">
             <Phone />
           </a>
         )}
->>>>>>> a9c9e73 (feat: add Lenovo support, implement repair status caching, and dynamically manage contact bubble visibility)
       </div>
 
       {/* Mobile Bottom Navigation (Native App Feel) */}
