@@ -341,10 +341,10 @@ function App() {
 
       {/* Quick Mobile Action Floating Buttons */}
       <div className="quick-contact-bar">
-        <a href="https://wa.me/918795427739?text=Hi%2C%20I%20want%20to%20inquire%20about%20a%20repair." target="_blank" rel="noopener noreferrer" className="contact-bubble whatsapp" aria-label="WhatsApp Inquiry">
+        <a href="https://wa.me/7458976787?text=Hi%2C%20I%20want%20to%20inquire%20about%20a%20repair." target="_blank" rel="noopener noreferrer" className="contact-bubble whatsapp" aria-label="WhatsApp Inquiry">
           <MessageSquare />
         </a>
-        <a href="tel:+918795427739" className="contact-bubble call" aria-label="Call Service Center">
+        <a href="tel:+7458976787" className="contact-bubble call" aria-label="Call Service Center">
           <Phone />
         </a>
       </div>
@@ -1055,7 +1055,7 @@ function TrackStatusView() {
           <input
             type="text"
             className="form-input"
-            placeholder="e.g. MOTO-8302 or 8795427739"
+            placeholder="e.g. MOTO-8302 or 574897984"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             required
@@ -1206,7 +1206,7 @@ function ContactView() {
                 </div>
                 <div>
                   <div className="contact-method-title">Call Us Directly</div>
-                  <div className="contact-method-detail">+91 7458976787 / +91 8795427739</div>
+                  <div className="contact-method-detail">+91 7458976787 / +91 6394273766</div>
                 </div>
               </div>
 
