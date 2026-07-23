@@ -237,8 +237,12 @@ function Slideshow({ slides, onUploadSlide }) {
 
 function App() {
   const [activeTab, setActiveTab] = useState(() => {
-    if (window.location.pathname === '/admin') return 'admin';
-    const isDirectRoute = window.location.pathname.match(/^\/(mobile|laptop)\/([a-zA-Z0-9_-]+)\/?$/);
+    const path = window.location.pathname;
+    const adminRoutes = ['/admin', '/moto', '/non-moto', '/expenses', '/overview'];
+    if (adminRoutes.includes(path)) {
+      return path === '/admin' ? 'admin' : path.substring(1);
+    }
+    const isDirectRoute = path.match(/^\/(mobile|laptop)\/([a-zA-Z0-9_-]+)\/?$/);
     if (isDirectRoute) return 'track';
     return 'home';
   });
@@ -272,14 +276,17 @@ function App() {
   // Sync pathname with state
   useEffect(() => {
     const handleLocationChange = () => {
-      if (window.location.pathname === '/admin') {
-        setActiveTab('admin');
+      const path = window.location.pathname;
+      const adminRoutes = ['/admin', '/moto', '/non-moto', '/expenses', '/overview'];
+      if (adminRoutes.includes(path)) {
+        setActiveTab(path === '/admin' ? 'admin' : path.substring(1));
       } else {
-        const isDirectRoute = window.location.pathname.match(/^\/(mobile|laptop)\/([a-zA-Z0-9_-]+)\/?$/);
+        const isDirectRoute = path.match(/^\/(mobile|laptop)\/([a-zA-Z0-9_-]+)\/?$/);
         if (isDirectRoute) {
           setActiveTab('track');
         } else {
-          setActiveTab((prev) => prev === 'admin' ? 'home' : prev);
+          const adminTabs = ['admin', 'moto', 'non-moto', 'expenses', 'overview'];
+          setActiveTab((prev) => adminTabs.includes(prev) ? 'home' : prev);
         }
       }
     };
@@ -289,12 +296,16 @@ function App() {
 
   // Update path on tab selection
   useEffect(() => {
-    if (activeTab === 'admin') {
-      if (window.location.pathname !== '/admin') {
-        window.history.pushState(null, '', '/admin');
+    const path = window.location.pathname;
+    const adminTabs = ['admin', 'moto', 'non-moto', 'expenses', 'overview'];
+    
+    if (adminTabs.includes(activeTab)) {
+      const targetPath = activeTab === 'admin' ? '/admin' : `/${activeTab}`;
+      if (path !== targetPath) {
+        window.history.pushState(null, '', targetPath);
       }
     } else if (activeTab !== 'track') {
-      if (window.location.pathname !== '/') {
+      if (path !== '/' && !path.startsWith('/services') && !path.startsWith('/book') && !path.startsWith('/contact')) {
         window.history.pushState(null, '', '/');
       }
     }
@@ -371,7 +382,9 @@ function App() {
         {activeTab === 'book' && <BookRepairView />}
         {activeTab === 'track' && <TrackStatusView setHideCallBubble={setHideCallBubble} />}
         {activeTab === 'contact' && <ContactView />}
-        {activeTab === 'admin' && <AdminView />}
+        {['admin', 'moto', 'non-moto', 'expenses', 'overview'].includes(activeTab) && (
+          <AdminView activeSection={activeTab} setActiveSection={setActiveTab} />
+        )}
       </main>
 
       {/* Quick Mobile Action Floating Buttons */}
@@ -1713,27 +1726,72 @@ function ContactView() {
 /* ==========================================================================
    6. ADMIN PORTAL VIEW
    ========================================================================== */
-function AdminView() {
+function AdminView({ activeSection = 'admin', setActiveSection }) {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('isAdminAuthenticated') === 'true';
+  });
+  const [username, setUsername] = useState(() => {
+    return localStorage.getItem('adminUsername') || '';
   });
   const [password, setPassword] = useState(() => {
     return localStorage.getItem('adminPassword') || '';
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  
+  // Data lists
   const [repairs, setRepairs] = useState([]);
   const [contacts, setContacts] = useState([]);
-  const [activeAdminTab, setActiveAdminTab] = useState('repairs'); // 'repairs', 'messages'
+  const [motoRepairs, setMotoRepairs] = useState([]);
+  const [nonMotoRepairs, setNonMotoRepairs] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [overviewData, setOverviewData] = useState(null);
+
+  // States
   const [updatingId, setUpdatingId] = useState(null);
   const [searchFilter, setSearchFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [warrantyFilter, setWarrantyFilter] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Fetch all bookings and contacts
-  const fetchAdminData = async (authPass = password) => {
+  // Modals for CRUD operations
+  const [repairModalOpen, setRepairModalOpen] = useState(false);
+  const [currentRepair, setCurrentRepair] = useState(null); // null for Add, object for Edit
+  const [repairForm, setRepairForm] = useState({
+    brand: 'Motorola',
+    device_model: '',
+    issue_description: '',
+    customer_name: '',
+    customer_email: '',
+    customer_phone: '',
+    customer_address: '',
+    service_type: 'Walk-in',
+    status: 'Received',
+    amount_collected: 0,
+    warranty_status: 'Out of Warranty',
+    receiving_date: new Date().toISOString().substring(0, 16),
+    giving_date: ''
+  });
+
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [currentExpense, setCurrentExpense] = useState(null); // null for Add, object for Edit
+  const [expenseForm, setExpenseForm] = useState({
+    description: '',
+    amount: '',
+    expense_date: new Date().toISOString().split('T')[0]
+  });
+
+  // Fetch standard Postgres database repairs & contacts
+  const fetchAdminData = async (authPass = password, authUser = username) => {
+    if (!authUser || authUser.toLowerCase() !== 'admin') {
+      setError('Invalid admin username. Access denied.');
+      setIsAuthenticated(false);
+      return;
+    }
+
+    setLoading(true);
     try {
-      // Get repairs
       const repairsRes = await fetch(`${API_BASE}/admin/repairs`, {
         headers: { 'x-admin-password': authPass }
       });
@@ -1746,17 +1804,16 @@ function AdminView() {
       const repairsData = await repairsRes.json();
       setRepairs(repairsData);
 
-      // Get contacts
       const contactsRes = await fetch(`${API_BASE}/admin/contacts`, {
         headers: { 'x-admin-password': authPass }
       });
       const contactsData = await contactsRes.json();
       if (contactsRes.ok) setContacts(contactsData);
 
-      // Successfully authenticated
       setIsAuthenticated(true);
       setError('');
       localStorage.setItem('isAdminAuthenticated', 'true');
+      localStorage.setItem('adminUsername', authUser);
       localStorage.setItem('adminPassword', authPass);
     } catch (err) {
       console.error('Error fetching admin data:', err);
@@ -1764,27 +1821,113 @@ function AdminView() {
         setError('Invalid admin password.');
         setIsAuthenticated(false);
         localStorage.removeItem('isAdminAuthenticated');
+        localStorage.removeItem('adminUsername');
         localStorage.removeItem('adminPassword');
       } else {
         setError('Server connection error. Failed to retrieve data.');
       }
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handle Login
+  // Fetch Motorola repairs (JSON)
+  const fetchMotoData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/moto`, {
+        headers: { 'x-admin-password': password }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMotoRepairs(data);
+      }
+    } catch (e) {
+      console.error('Error fetching Motorola repairs:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch Non-Motorola repairs (JSON)
+  const fetchNonMotoData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/non-moto`, {
+        headers: { 'x-admin-password': password }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNonMotoRepairs(data);
+      }
+    } catch (e) {
+      console.error('Error fetching laptop repairs:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch Expenses (JSON)
+  const fetchExpensesData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/expenses`, {
+        headers: { 'x-admin-password': password }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setExpenses(data);
+      }
+    } catch (e) {
+      console.error('Error fetching expenses:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch Financial Overview
+  const fetchOverviewData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/overview`, {
+        headers: { 'x-admin-password': password }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOverviewData(data);
+      }
+    } catch (e) {
+      console.error('Error fetching overview details:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Trigger login
   const handleLogin = (e) => {
     e.preventDefault();
-    fetchAdminData(password);
+    fetchAdminData(password, username);
   };
 
-  // Trigger fetch updates when authenticated
+  // Trigger fetches depending on active section
   useEffect(() => {
     if (isAuthenticated && password) {
-      fetchAdminData(password);
-    }
-  }, [isAuthenticated]);
+      // Reset filter states when tab switches
+      setSearchFilter('');
+      setBrandFilter('');
+      setStatusFilter('');
+      setWarrantyFilter('');
 
-  // Update repair status
+      if (activeSection === 'admin') fetchAdminData(password, username);
+      else if (activeSection === 'moto') fetchMotoData();
+      else if (activeSection === 'non-moto') fetchNonMotoData();
+      else if (activeSection === 'expenses') fetchExpensesData();
+      else if (activeSection === 'overview') fetchOverviewData();
+      else if (activeSection === 'messages') fetchAdminData(password, username);
+    }
+  }, [isAuthenticated, activeSection]);
+
+  // Update Postgres repair status (original dashboard)
   const handleStatusChange = async (id, newStatus) => {
     setUpdatingId(id);
     try {
@@ -1798,7 +1941,6 @@ function AdminView() {
       });
 
       if (response.ok) {
-        // Update local state
         setRepairs(repairs.map(r => r.id === parseInt(id) ? { ...r, status: newStatus } : r));
       } else {
         const errData = await response.json();
@@ -1811,7 +1953,171 @@ function AdminView() {
     }
   };
 
-  // Filter repairs locally
+  // Modal handlers
+  const handleOpenRepairModal = (repair = null, isNonMoto = false) => {
+    if (repair) {
+      setCurrentRepair(repair);
+      setRepairForm({
+        brand: repair.brand,
+        device_model: repair.device_model,
+        issue_description: repair.issue_description,
+        customer_name: repair.customer_name,
+        customer_email: repair.customer_email,
+        customer_phone: repair.customer_phone,
+        customer_address: repair.customer_address,
+        service_type: repair.service_type,
+        status: repair.status,
+        amount_collected: repair.amount_collected,
+        warranty_status: repair.warranty_status,
+        receiving_date: repair.receiving_date ? repair.receiving_date.substring(0, 16) : new Date().toISOString().substring(0, 16),
+        giving_date: repair.giving_date ? repair.giving_date.substring(0, 16) : ''
+      });
+    } else {
+      setCurrentRepair(null);
+      setRepairForm({
+        brand: isNonMoto ? 'Dell' : 'Motorola',
+        device_model: '',
+        issue_description: '',
+        customer_name: '',
+        customer_email: '',
+        customer_phone: '',
+        customer_address: '',
+        service_type: 'Walk-in',
+        status: 'Received',
+        amount_collected: 0,
+        warranty_status: 'Out of Warranty',
+        receiving_date: new Date().toISOString().substring(0, 16),
+        giving_date: ''
+      });
+    }
+    setRepairModalOpen(true);
+  };
+
+  const handleSaveRepair = async (e) => {
+    e.preventDefault();
+    const endpoint = repairForm.brand === 'Motorola' ? 'moto' : 'non-moto';
+    const isEdit = !!currentRepair;
+    const url = isEdit 
+      ? `${API_BASE}/admin/${endpoint}/${currentRepair.id}`
+      : `${API_BASE}/admin/${endpoint}`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': password
+        },
+        body: JSON.stringify(repairForm)
+      });
+
+      if (response.ok) {
+        setRepairModalOpen(false);
+        if (repairForm.brand === 'Motorola') {
+          fetchMotoData();
+        } else {
+          fetchNonMotoData();
+        }
+        alert(`Record ${isEdit ? 'updated' : 'created'} successfully.`);
+      } else {
+        const err = await response.json();
+        alert(err.error || 'Failed to save record.');
+      }
+    } catch (err) {
+      alert('Error communicating with backend.');
+    }
+  };
+
+  const handleDeleteRepair = async (id, isMoto) => {
+    if (!window.confirm('Are you sure you want to delete this repair record?')) return;
+    const endpoint = isMoto ? 'moto' : 'non-moto';
+    try {
+      const response = await fetch(`${API_BASE}/admin/${endpoint}/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-password': password }
+      });
+      if (response.ok) {
+        if (isMoto) fetchMotoData();
+        else fetchNonMotoData();
+        alert('Record deleted successfully.');
+      } else {
+        alert('Failed to delete record.');
+      }
+    } catch (err) {
+      alert('Error communicating with backend.');
+    }
+  };
+
+  const handleOpenExpenseModal = (expense = null) => {
+    if (expense) {
+      setCurrentExpense(expense);
+      setExpenseForm({
+        description: expense.description,
+        amount: expense.amount,
+        expense_date: expense.expense_date ? expense.expense_date.split('T')[0] : new Date().toISOString().split('T')[0]
+      });
+    } else {
+      setCurrentExpense(null);
+      setExpenseForm({
+        description: '',
+        amount: '',
+        expense_date: new Date().toISOString().split('T')[0]
+      });
+    }
+    setExpenseModalOpen(true);
+  };
+
+  const handleSaveExpense = async (e) => {
+    e.preventDefault();
+    const isEdit = !!currentExpense;
+    const url = isEdit 
+      ? `${API_BASE}/admin/expenses/${currentExpense.id}`
+      : `${API_BASE}/admin/expenses`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': password
+        },
+        body: JSON.stringify(expenseForm)
+      });
+
+      if (response.ok) {
+        setExpenseModalOpen(false);
+        fetchExpensesData();
+        alert(`Expense ${isEdit ? 'updated' : 'created'} successfully.`);
+      } else {
+        const err = await response.json();
+        alert(err.error || 'Failed to save expense.');
+      }
+    } catch (err) {
+      alert('Error communicating with backend.');
+    }
+  };
+
+  const handleDeleteExpense = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this expense record?')) return;
+    try {
+      const response = await fetch(`${API_BASE}/admin/expenses/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-password': password }
+      });
+      if (response.ok) {
+        fetchExpensesData();
+        alert('Expense deleted successfully.');
+      } else {
+        alert('Failed to delete expense.');
+      }
+    } catch (err) {
+      alert('Error communicating with backend.');
+    }
+  };
+
+  // Filter Postgres repairs locally
   const filteredRepairs = repairs.filter(repair => {
     const matchesSearch =
       repair.ticket_id.toLowerCase().includes(searchFilter.toLowerCase()) ||
@@ -1831,7 +2137,7 @@ function AdminView() {
             <Lock />
           </div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '8px' }}>Admin Dashboard</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '20px' }}>Enter the admin password configured in your environment.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '20px' }}>Enter your admin username and password.</p>
 
           {error && (
             <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '10px', borderRadius: '6px', color: '#f87171', fontSize: '0.8rem', marginBottom: '16px', textAlign: 'left' }}>
@@ -1840,14 +2146,26 @@ function AdminView() {
           )}
 
           <form onSubmit={handleLogin}>
-            <div className="form-group">
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label className="form-label" htmlFor="admin_user">Username</label>
+              <input
+                type="text"
+                id="admin_user"
+                className="form-input"
+                placeholder="Enter username (default: admin)"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: '20px' }}>
               <label className="form-label" htmlFor="admin_pass">Password</label>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showPassword ? "text" : "password"}
                   id="admin_pass"
                   className="form-input"
-                  placeholder="Enter password (default: admin123)"
+                  placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   style={{ paddingRight: '48px' }}
@@ -1878,8 +2196,8 @@ function AdminView() {
                 </button>
               </div>
             </div>
-            <button type="submit" className="btn btn-primary btn-block">
-              Authenticate <ChevronRight size={16} />
+            <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+              {loading ? 'Authenticating...' : 'Authenticate'} <ChevronRight size={16} />
             </button>
           </form>
         </div>
@@ -1889,15 +2207,22 @@ function AdminView() {
 
   return (
     <div className="container section">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '1.8rem', fontWeight: '800', margin: 0, textAlign: 'left' }}>Management Panel</h2>
+      {/* Admin Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ textAlign: 'left' }}>
+          <h2 style={{ fontSize: '1.8rem', fontWeight: '800', margin: 0 }}>Management Panel</h2>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>Logged in as admin ({username})</p>
+        </div>
         <button 
           className="btn btn-secondary" 
           onClick={() => {
             setIsAuthenticated(false);
+            setUsername('');
             setPassword('');
             localStorage.removeItem('isAdminAuthenticated');
+            localStorage.removeItem('adminUsername');
             localStorage.removeItem('adminPassword');
+            setActiveSection('admin');
           }} 
           style={{ padding: '8px 16px', fontSize: '0.85rem' }}
         >
@@ -1905,18 +2230,54 @@ function AdminView() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="admin-tabs">
-        <button className={`admin-tab ${activeAdminTab === 'repairs' ? 'active' : ''}`} onClick={() => setActiveAdminTab('repairs')}>
-          Repair Tickets ({repairs.length})
+      {/* Admin Navigation Tabs */}
+      <div className="admin-tabs" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+        <button 
+          className={`admin-tab ${activeSection === 'admin' ? 'active' : ''}`} 
+          onClick={() => setActiveSection('admin')}
+          style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeSection === 'admin' ? 'var(--color-moto)' : 'transparent', color: activeSection === 'admin' ? '#fff' : 'var(--text-secondary)', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          📋 Service Tickets ({repairs.length})
         </button>
-        <button className={`admin-tab ${activeAdminTab === 'messages' ? 'active' : ''}`} onClick={() => setActiveAdminTab('messages')}>
-          Contact Messages ({contacts.length})
+        <button 
+          className={`admin-tab ${activeSection === 'moto' ? 'active' : ''}`} 
+          onClick={() => setActiveSection('moto')}
+          style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeSection === 'moto' ? 'var(--color-moto)' : 'transparent', color: activeSection === 'moto' ? '#fff' : 'var(--text-secondary)', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          📱 Motorola Database ({motoRepairs.length})
+        </button>
+        <button 
+          className={`admin-tab ${activeSection === 'non-moto' ? 'active' : ''}`} 
+          onClick={() => setActiveSection('non-moto')}
+          style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeSection === 'non-moto' ? 'var(--color-moto)' : 'transparent', color: activeSection === 'non-moto' ? '#fff' : 'var(--text-secondary)', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          💻 Laptop Database ({nonMotoRepairs.length})
+        </button>
+        <button 
+          className={`admin-tab ${activeSection === 'expenses' ? 'active' : ''}`} 
+          onClick={() => setActiveSection('expenses')}
+          style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeSection === 'expenses' ? 'var(--color-moto)' : 'transparent', color: activeSection === 'expenses' ? '#fff' : 'var(--text-secondary)', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          💸 Operational Expenses ({expenses.length})
+        </button>
+        <button 
+          className={`admin-tab ${activeSection === 'overview' ? 'active' : ''}`} 
+          onClick={() => setActiveSection('overview')}
+          style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeSection === 'overview' ? 'var(--color-moto)' : 'transparent', color: activeSection === 'overview' ? '#fff' : 'var(--text-secondary)', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          📊 Profit & Loss Overview
+        </button>
+        <button 
+          className={`admin-tab ${activeSection === 'messages' ? 'active' : ''}`} 
+          onClick={() => setActiveSection('messages')}
+          style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: activeSection === 'messages' ? 'var(--color-moto)' : 'transparent', color: activeSection === 'messages' ? '#fff' : 'var(--text-secondary)', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          ✉️ Inquiries ({contacts.length})
         </button>
       </div>
 
-      {/* Repair Tickets Management */}
-      {activeAdminTab === 'repairs' && (
+      {/* Repairs Tab (Original) */}
+      {activeSection === 'admin' && (
         <div>
           {/* Filters Bar */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', background: 'var(--bg-secondary)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
@@ -2021,8 +2382,467 @@ function AdminView() {
         </div>
       )}
 
+      {/* Motorola repairs Tab */}
+      {activeSection === 'moto' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', textAlign: 'left' }}>Motorola Registry (moto.json)</h3>
+            <button className="btn btn-primary" onClick={() => handleOpenRepairModal(null, false)} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+              + Add Motorola Record
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', background: 'var(--bg-secondary)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', width: '100%' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search model, customer name or phone..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                style={{ flex: 2, minWidth: '200px', padding: '8px 12px', fontSize: '0.85rem' }}
+              />
+              <select
+                className="form-input"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ flex: 1, minWidth: '150px', padding: '8px 12px', fontSize: '0.85rem' }}
+              >
+                <option value="">All Statuses</option>
+                <option value="Received">Received</option>
+                <option value="Diagnosis">Diagnosis</option>
+                <option value="In Repair">In Repair</option>
+                <option value="Quality Check">Quality Check</option>
+                <option value="Ready for Pickup">Ready for Pickup</option>
+                <option value="Delivered">Delivered</option>
+              </select>
+              <select
+                className="form-input"
+                value={warrantyFilter}
+                onChange={(e) => setWarrantyFilter(e.target.value)}
+                style={{ flex: 1, minWidth: '150px', padding: '8px 12px', fontSize: '0.85rem' }}
+              >
+                <option value="">All Warranties</option>
+                <option value="In Warranty">In Warranty</option>
+                <option value="Out of Warranty">Out of Warranty</option>
+              </select>
+            </div>
+          </div>
+
+          {motoRepairs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', border: '1px dashed var(--border-color)', borderRadius: '12px', color: 'var(--text-secondary)' }}>
+              No Motorola repair tickets found. Click "+ Add Motorola Record" to add one.
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Ticket ID</th>
+                    <th>Model</th>
+                    <th>Customer Name</th>
+                    <th>Phone / Address</th>
+                    <th>Warranty</th>
+                    <th>Dates (Recv to Delv)</th>
+                    <th>Amount (₹)</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {motoRepairs
+                    .filter(r => {
+                      const matchesSearch = r.device_model.toLowerCase().includes(searchFilter.toLowerCase()) || 
+                                            r.customer_name.toLowerCase().includes(searchFilter.toLowerCase()) || 
+                                            r.customer_phone.includes(searchFilter);
+                      const matchesStatus = statusFilter ? r.status === statusFilter : true;
+                      const matchesWarranty = warrantyFilter ? r.warranty_status === warrantyFilter : true;
+                      return matchesSearch && matchesStatus && matchesWarranty;
+                    })
+                    .map((repair) => (
+                      <tr key={repair.id}>
+                        <td style={{ fontWeight: '700', color: 'var(--color-moto)' }}>{repair.ticket_id}</td>
+                        <td style={{ fontWeight: '600' }}>{repair.device_model}</td>
+                        <td>{repair.customer_name}</td>
+                        <td>
+                          <div style={{ fontSize: '0.75rem', fontWeight: '600' }}>{repair.customer_phone}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={repair.customer_address}>
+                            {repair.customer_address || 'No Address'}
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{ 
+                            fontSize: '0.75rem', 
+                            padding: '4px 8px', 
+                            borderRadius: '12px', 
+                            fontWeight: '600',
+                            background: repair.warranty_status === 'In Warranty' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', 
+                            color: repair.warranty_status === 'In Warranty' ? '#10b981' : '#ef4444' 
+                          }}>
+                            {repair.warranty_status}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ fontSize: '0.75rem' }}>Recv: {repair.receiving_date ? new Date(repair.receiving_date).toLocaleDateString() : 'N/A'}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Delv: {repair.giving_date ? new Date(repair.giving_date).toLocaleDateString() : 'Pending'}</div>
+                        </td>
+                        <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{parseFloat(repair.amount_collected || 0).toFixed(2)}</td>
+                        <td>
+                          <span className={`status-badge ${repair.status?.toLowerCase().replace(/\s+/g, '-')}`} style={{ 
+                            fontSize: '0.75rem', 
+                            padding: '4px 8px', 
+                            borderRadius: '12px', 
+                            fontWeight: '600',
+                            background: 'rgba(2, 132, 199, 0.1)', 
+                            color: 'var(--color-moto)' 
+                          }}>
+                            {repair.status}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => handleOpenRepairModal(repair, false)} style={{ background: 'none', border: 'none', color: 'var(--color-moto)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}>Edit</button>
+                            <button onClick={() => handleDeleteRepair(repair.id, true)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}>Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Laptop / Non-Motorola repairs Tab */}
+      {activeSection === 'non-moto' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', textAlign: 'left' }}>Laptop & Other Devices Registry (non-moto.json)</h3>
+            <button className="btn btn-primary" onClick={() => handleOpenRepairModal(null, true)} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+              + Add Laptop Record
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', background: 'var(--bg-secondary)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', width: '100%' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search brand, model, customer name or phone..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                style={{ flex: 2, minWidth: '200px', padding: '8px 12px', fontSize: '0.85rem' }}
+              />
+              <select
+                className="form-input"
+                value={brandFilter}
+                onChange={(e) => setBrandFilter(e.target.value)}
+                style={{ flex: 1, minWidth: '120px', padding: '8px 12px', fontSize: '0.85rem' }}
+              >
+                <option value="">All Brands</option>
+                <option value="Dell">Dell</option>
+                <option value="HP">HP</option>
+                <option value="Asus">Asus</option>
+                <option value="Acer">Acer</option>
+                <option value="Lenovo">Lenovo</option>
+              </select>
+              <select
+                className="form-input"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ flex: 1, minWidth: '120px', padding: '8px 12px', fontSize: '0.85rem' }}
+              >
+                <option value="">All Statuses</option>
+                <option value="Received">Received</option>
+                <option value="Diagnosis">Diagnosis</option>
+                <option value="In Repair">In Repair</option>
+                <option value="Quality Check">Quality Check</option>
+                <option value="Ready for Pickup">Ready for Pickup</option>
+                <option value="Delivered">Delivered</option>
+              </select>
+              <select
+                className="form-input"
+                value={warrantyFilter}
+                onChange={(e) => setWarrantyFilter(e.target.value)}
+                style={{ flex: 1, minWidth: '120px', padding: '8px 12px', fontSize: '0.85rem' }}
+              >
+                <option value="">All Warranties</option>
+                <option value="In Warranty">In Warranty</option>
+                <option value="Out of Warranty">Out of Warranty</option>
+              </select>
+            </div>
+          </div>
+
+          {nonMotoRepairs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', border: '1px dashed var(--border-color)', borderRadius: '12px', color: 'var(--text-secondary)' }}>
+              No Laptop / non-Motorola repair tickets found. Click "+ Add Laptop Record" to add one.
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Ticket ID</th>
+                    <th>Brand & Model</th>
+                    <th>Customer Name</th>
+                    <th>Phone / Address</th>
+                    <th>Warranty</th>
+                    <th>Dates (Recv to Delv)</th>
+                    <th>Amount (₹)</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {nonMotoRepairs
+                    .filter(r => {
+                      const matchesSearch = r.brand.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                                            r.device_model.toLowerCase().includes(searchFilter.toLowerCase()) || 
+                                            r.customer_name.toLowerCase().includes(searchFilter.toLowerCase()) || 
+                                            r.customer_phone.includes(searchFilter);
+                      const matchesBrand = brandFilter ? r.brand === brandFilter : true;
+                      const matchesStatus = statusFilter ? r.status === statusFilter : true;
+                      const matchesWarranty = warrantyFilter ? r.warranty_status === warrantyFilter : true;
+                      return matchesSearch && matchesBrand && matchesStatus && matchesWarranty;
+                    })
+                    .map((repair) => (
+                      <tr key={repair.id}>
+                        <td style={{ fontWeight: '700', color: 'var(--color-moto)' }}>{repair.ticket_id}</td>
+                        <td style={{ fontWeight: '600' }}>
+                          <span style={{ color: `var(--color-${repair.brand?.toLowerCase()})`, marginRight: '4px' }}>[{repair.brand}]</span>
+                          {repair.device_model}
+                        </td>
+                        <td>{repair.customer_name}</td>
+                        <td>
+                          <div style={{ fontSize: '0.75rem', fontWeight: '600' }}>{repair.customer_phone}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={repair.customer_address}>
+                            {repair.customer_address || 'No Address'}
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{ 
+                            fontSize: '0.75rem', 
+                            padding: '4px 8px', 
+                            borderRadius: '12px', 
+                            fontWeight: '600',
+                            background: repair.warranty_status === 'In Warranty' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', 
+                            color: repair.warranty_status === 'In Warranty' ? '#10b981' : '#ef4444' 
+                          }}>
+                            {repair.warranty_status}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ fontSize: '0.75rem' }}>Recv: {repair.receiving_date ? new Date(repair.receiving_date).toLocaleDateString() : 'N/A'}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Delv: {repair.giving_date ? new Date(repair.giving_date).toLocaleDateString() : 'Pending'}</div>
+                        </td>
+                        <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{parseFloat(repair.amount_collected || 0).toFixed(2)}</td>
+                        <td>
+                          <span className={`status-badge ${repair.status?.toLowerCase().replace(/\s+/g, '-')}`} style={{ 
+                            fontSize: '0.75rem', 
+                            padding: '4px 8px', 
+                            borderRadius: '12px', 
+                            fontWeight: '600',
+                            background: 'rgba(2, 132, 199, 0.1)', 
+                            color: 'var(--color-moto)' 
+                          }}>
+                            {repair.status}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => handleOpenRepairModal(repair, true)} style={{ background: 'none', border: 'none', color: 'var(--color-moto)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}>Edit</button>
+                            <button onClick={() => handleDeleteRepair(repair.id, false)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}>Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Expenses Tab */}
+      {activeSection === 'expenses' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', textAlign: 'left' }}>Operational Expenses Log (overall.json)</h3>
+            <button className="btn btn-primary" onClick={() => handleOpenExpenseModal(null)} style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+              + Add Expense Record
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', background: 'var(--bg-secondary)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '20px' }}>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Search by description (e.g. Rent, Spare display, Coffee)..."
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              style={{ width: '100%', padding: '8px 12px', fontSize: '0.85rem' }}
+            />
+          </div>
+
+          {expenses.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', border: '1px dashed var(--border-color)', borderRadius: '12px', color: 'var(--text-secondary)' }}>
+              No operational expenses logged yet. Click "+ Add Expense Record" to add one.
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '80px' }}>ID</th>
+                    <th>Description</th>
+                    <th>Amount (₹)</th>
+                    <th>Expense Date</th>
+                    <th>Logged At</th>
+                    <th style={{ width: '120px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses
+                    .filter(e => e.description.toLowerCase().includes(searchFilter.toLowerCase()))
+                    .map((exp) => (
+                      <tr key={exp.id}>
+                        <td style={{ fontWeight: '700', color: 'var(--text-muted)' }}>#{exp.id}</td>
+                        <td style={{ fontWeight: '600' }}>{exp.description}</td>
+                        <td style={{ fontWeight: '700', color: '#ef4444' }}>₹{parseFloat(exp.amount || 0).toFixed(2)}</td>
+                        <td>{new Date(exp.expense_date).toLocaleDateString()}</td>
+                        <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(exp.created_at || exp.expense_date).toLocaleString()}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => handleOpenExpenseModal(exp)} style={{ background: 'none', border: 'none', color: 'var(--color-moto)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}>Edit</button>
+                            <button onClick={() => handleDeleteExpense(exp.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}>Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Financial Overview Tab */}
+      {activeSection === 'overview' && (
+        <div>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '20px', textAlign: 'left' }}>Financial P&L Overview</h3>
+          
+          {overviewData ? (
+            <div>
+              {/* Stat Cards Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+                
+                {/* Moto Card */}
+                <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', boxShadow: 'var(--shadow-sm)', textAlign: 'left', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'rgba(2, 132, 199, 0.08)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-moto)', marginBottom: '16px' }}>
+                    <Smartphone size={20} />
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Motorola Income</span>
+                  <h4 style={{ fontSize: '1.6rem', fontWeight: '800', margin: '4px 0 2px' }}>₹{parseFloat(overviewData.motoRevenue).toFixed(2)}</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>From {overviewData.motoCount} repair records</p>
+                </div>
+
+                {/* Laptop Card */}
+                <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', boxShadow: 'var(--shadow-sm)', textAlign: 'left', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'rgba(2, 132, 199, 0.08)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-moto)', marginBottom: '16px' }}>
+                    <Laptop size={20} />
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Laptop/Other Income</span>
+                  <h4 style={{ fontSize: '1.6rem', fontWeight: '800', margin: '4px 0 2px' }}>₹{parseFloat(overviewData.nonMotoRevenue).toFixed(2)}</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>From {overviewData.nonMotoCount} repair records</p>
+                </div>
+
+                {/* Total Revenue Card */}
+                <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', boxShadow: 'var(--shadow-sm)', textAlign: 'left', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', marginBottom: '16px' }}>
+                    <CheckCircle size={20} />
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Total Revenue</span>
+                  <h4 style={{ fontSize: '1.6rem', fontWeight: '800', margin: '4px 0 2px', color: '#10b981' }}>₹{parseFloat(overviewData.totalRevenue).toFixed(2)}</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Sum of all service earnings</p>
+                </div>
+
+                {/* Expenses Card */}
+                <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', boxShadow: 'var(--shadow-sm)', textAlign: 'left', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', marginBottom: '16px' }}>
+                    <AlertCircle size={20} />
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Total Expenses</span>
+                  <h4 style={{ fontSize: '1.6rem', fontWeight: '800', margin: '4px 0 2px', color: '#ef4444' }}>₹{parseFloat(overviewData.totalExpenses).toFixed(2)}</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>From {overviewData.expensesCount} logged items</p>
+                </div>
+
+              </div>
+
+              {/* Profit & Loss Main Panel */}
+              <div style={{ 
+                background: overviewData.netProfit >= 0 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                color: '#ffffff',
+                borderRadius: '24px',
+                padding: '40px',
+                textAlign: 'center',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                marginBottom: '40px',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '200px', height: '200px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }}></div>
+                <div style={{ position: 'absolute', bottom: '-80px', left: '-80px', width: '250px', height: '250px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }}></div>
+
+                <span style={{ fontSize: '0.9rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '2px', opacity: 0.9 }}>
+                  NET CENTER BALANCE
+                </span>
+                <h2 style={{ fontSize: '3.5rem', fontWeight: '900', margin: '12px 0 8px', letterSpacing: '-1.5px', textShadow: '0 2px 10px rgba(0,0,0,0.15)' }}>
+                  {overviewData.netProfit >= 0 ? '+' : '-'}₹{Math.abs(parseFloat(overviewData.netProfit)).toFixed(2)}
+                </h2>
+                <div style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  background: 'rgba(255, 255, 255, 0.2)', 
+                  padding: '6px 16px', 
+                  borderRadius: '30px', 
+                  fontSize: '0.85rem', 
+                  fontWeight: '700' 
+                }}>
+                  {overviewData.netProfit >= 0 ? '🟢 OPERATIONAL PROFIT' : '🔴 OPERATIONAL LOSS'}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', marginTop: '40px', paddingTop: '30px', borderTop: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', opacity: 0.8, fontWeight: '600' }}>PROFIT MARGIN</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: '800', marginTop: '4px' }}>
+                      {overviewData.totalRevenue > 0 ? ((overviewData.netProfit / overviewData.totalRevenue) * 100).toFixed(1) : '0.0'}%
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', opacity: 0.8, fontWeight: '600' }}>TOTAL REPAIRS RECORDED</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: '800', marginTop: '4px' }}>
+                      {overviewData.motoCount + overviewData.nonMotoCount}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', opacity: 0.8, fontWeight: '600' }}>EXPENSE-TO-REVENUE RATIO</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: '800', marginTop: '4px' }}>
+                      {overviewData.totalRevenue > 0 ? ((overviewData.totalExpenses / overviewData.totalRevenue) * 100).toFixed(1) : '0.0'}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '40px' }}>Loading overview details...</div>
+          )}
+        </div>
+      )}
+
       {/* Contact Messages Management */}
-      {activeAdminTab === 'messages' && (
+      {activeSection === 'messages' && (
         <div>
           {contacts.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', border: '1px dashed var(--border-color)', borderRadius: '12px', color: 'var(--text-secondary)' }}>
@@ -2047,7 +2867,7 @@ function AdminView() {
                         <div style={{ fontSize: '0.8rem' }}>{msg.email}</div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{msg.phone || 'No Phone'}</div>
                       </td>
-                      <td style={{ color: 'var(--text-primary)', fontSize: '0.8rem', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{msg.message}</td>
+                      <td style={{ color: 'var(--text-primary)', fontSize: '0.8rem', whiteSpace: 'pre-wrap', lineHeight: '1.4', textAlign: 'left' }}>{msg.message}</td>
                       <td>{new Date(msg.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
@@ -2055,6 +2875,253 @@ function AdminView() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Repair Record Modal (Add/Edit) */}
+      {repairModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: '800' }}>
+                {currentRepair ? `Edit Ticket ${currentRepair.ticket_id}` : `Add New Repair Record`}
+              </h3>
+              <button onClick={() => setRepairModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: 'var(--text-muted)' }}>&times;</button>
+            </div>
+
+            <form onSubmit={handleSaveRepair}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', textAlign: 'left' }}>
+                {/* Brand selection */}
+                <div className="form-group">
+                  <label className="form-label">Brand</label>
+                  {repairForm.brand === 'Motorola' ? (
+                    <input type="text" className="form-input" value="Motorola" disabled style={{ background: '#f1f5f9' }} />
+                  ) : (
+                    <select 
+                      className="form-input" 
+                      value={repairForm.brand} 
+                      onChange={(e) => setRepairForm({ ...repairForm, brand: e.target.value })}
+                      required
+                    >
+                      <option value="Dell">Dell</option>
+                      <option value="HP">HP</option>
+                      <option value="Asus">Asus</option>
+                      <option value="Acer">Acer</option>
+                      <option value="Lenovo">Lenovo</option>
+                    </select>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Device Model</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="e.g. Moto Edge 50 Ultra or Latitude 5420"
+                    value={repairForm.device_model} 
+                    onChange={(e) => setRepairForm({ ...repairForm, device_model: e.target.value })} 
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', textAlign: 'left' }}>
+                <div className="form-group">
+                  <label className="form-label">Customer Name</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={repairForm.customer_name} 
+                    onChange={(e) => setRepairForm({ ...repairForm, customer_name: e.target.value })} 
+                    required 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Customer Phone</label>
+                  <input 
+                    type="tel" 
+                    className="form-input" 
+                    value={repairForm.customer_phone} 
+                    onChange={(e) => setRepairForm({ ...repairForm, customer_phone: e.target.value })} 
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ textAlign: 'left' }}>
+                <label className="form-label">Customer Email</label>
+                <input 
+                  type="email" 
+                  className="form-input" 
+                  value={repairForm.customer_email} 
+                  onChange={(e) => setRepairForm({ ...repairForm, customer_email: e.target.value })} 
+                />
+              </div>
+
+              <div className="form-group" style={{ textAlign: 'left' }}>
+                <label className="form-label">Customer Address</label>
+                <textarea 
+                  className="form-input" 
+                  value={repairForm.customer_address} 
+                  onChange={(e) => setRepairForm({ ...repairForm, customer_address: e.target.value })} 
+                  style={{ minHeight: '60px' }}
+                />
+              </div>
+
+              <div className="form-group" style={{ textAlign: 'left' }}>
+                <label className="form-label">Issue Description</label>
+                <textarea 
+                  className="form-input" 
+                  value={repairForm.issue_description} 
+                  onChange={(e) => setRepairForm({ ...repairForm, issue_description: e.target.value })} 
+                  style={{ minHeight: '60px' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', textAlign: 'left' }}>
+                <div className="form-group">
+                  <label className="form-label">Warranty Status</label>
+                  <select 
+                    className="form-input" 
+                    value={repairForm.warranty_status} 
+                    onChange={(e) => setRepairForm({ ...repairForm, warranty_status: e.target.value })}
+                  >
+                    <option value="Out of Warranty">Out of Warranty (OOW)</option>
+                    <option value="In Warranty">In Warranty</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Amount Collected (₹)</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={repairForm.amount_collected} 
+                    onChange={(e) => setRepairForm({ ...repairForm, amount_collected: parseFloat(e.target.value) || 0 })} 
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', textAlign: 'left' }}>
+                <div className="form-group">
+                  <label className="form-label">Service Type</label>
+                  <select 
+                    className="form-input" 
+                    value={repairForm.service_type} 
+                    onChange={(e) => setRepairForm({ ...repairForm, service_type: e.target.value })}
+                  >
+                    <option value="Walk-in">Walk-in</option>
+                    <option value="Home Pickup">Home Pickup</option>
+                    <option value="Courier">Courier</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Repair Status</label>
+                  <select 
+                    className="form-input" 
+                    value={repairForm.status} 
+                    onChange={(e) => setRepairForm({ ...repairForm, status: e.target.value })}
+                  >
+                    <option value="Received">Received</option>
+                    <option value="Diagnosis">Diagnosis</option>
+                    <option value="In Repair">In Repair</option>
+                    <option value="Quality Check">Quality Check</option>
+                    <option value="Ready for Pickup">Ready for Pickup</option>
+                    <option value="Delivered">Delivered</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', textAlign: 'left' }}>
+                <div className="form-group">
+                  <label className="form-label">Receiving Date</label>
+                  <input 
+                    type="datetime-local" 
+                    className="form-input" 
+                    value={repairForm.receiving_date} 
+                    onChange={(e) => setRepairForm({ ...repairForm, receiving_date: e.target.value })} 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Giving Date (Delivery)</label>
+                  <input 
+                    type="datetime-local" 
+                    className="form-input" 
+                    value={repairForm.giving_date} 
+                    onChange={(e) => setRepairForm({ ...repairForm, giving_date: e.target.value })} 
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Save Record</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setRepairModalOpen(false)} style={{ flex: 1 }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Expense Modal (Add/Edit) */}
+      {expenseModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '450px', padding: '28px', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: '800' }}>
+                {currentExpense ? `Edit Expense #${currentExpense.id}` : `Log New Expense`}
+              </h3>
+              <button onClick={() => setExpenseModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: 'var(--text-muted)' }}>&times;</button>
+            </div>
+
+            <form onSubmit={handleSaveExpense}>
+              <div className="form-group" style={{ textAlign: 'left' }}>
+                <label className="form-label">Description</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="e.g. Rent, Spare screen Moto G54, Electricity"
+                  value={expenseForm.description} 
+                  onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })} 
+                  required 
+                />
+              </div>
+
+              <div className="form-group" style={{ textAlign: 'left' }}>
+                <label className="form-label">Amount (₹)</label>
+                <input 
+                  type="number" 
+                  className="form-input" 
+                  placeholder="0.00"
+                  value={expenseForm.amount} 
+                  onChange={(e) => setExpenseForm({ ...expenseForm, amount: parseFloat(e.target.value) || '' })} 
+                  min="0.01"
+                  step="0.01"
+                  required 
+                />
+              </div>
+
+              <div className="form-group" style={{ textAlign: 'left' }}>
+                <label className="form-label">Expense Date</label>
+                <input 
+                  type="date" 
+                  className="form-input" 
+                  value={expenseForm.expense_date} 
+                  onChange={(e) => setExpenseForm({ ...expenseForm, expense_date: e.target.value })} 
+                  required 
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Save Expense</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setExpenseModalOpen(false)} style={{ flex: 1 }}>Cancel</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
