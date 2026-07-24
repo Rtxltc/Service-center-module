@@ -223,51 +223,28 @@ app.get('/api/admin/contacts', checkAdminAuth, async (req, res) => {
   }
 });
 
-// JSON File Database Helpers and Endpoints (Admin Records and Expenses)
-const fs = require('fs');
-
-const motoPath = path.join(__dirname, 'moto.json');
-const nonMotoPath = path.join(__dirname, 'non-moto.json');
-const overallPath = path.join(__dirname, 'overall.json');
-
-// Helper to safely read JSON
-const readJsonFile = (filePath) => {
-  try {
-    if (!fs.existsSync(filePath)) {
-      if (filePath.endsWith('overall.json')) {
-        fs.writeFileSync(filePath, JSON.stringify({ expenses: [] }, null, 2));
-      } else {
-        fs.writeFileSync(filePath, '[]');
-      }
-    }
-    const content = fs.readFileSync(filePath, 'utf8').trim();
-    if (!content) return filePath.endsWith('overall.json') ? { expenses: [] } : [];
-    return JSON.parse(content);
-  } catch (err) {
-    console.error('Error reading JSON file:', filePath, err);
-    return filePath.endsWith('overall.json') ? { expenses: [] } : [];
-  }
+// Helper to safely parse dates for PostgreSQL (converts empty/whitespace strings to null)
+const parseDbDate = (val) => {
+  if (val === undefined || val === null) return null;
+  const s = String(val).trim();
+  return s === '' ? null : s;
 };
 
-// Helper to write JSON
-const writeJsonFile = (filePath, data) => {
-  try {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error('Error writing JSON file:', filePath, err);
-  }
-};
-
-// Motorola JSON CRUD APIs
+// --- Motorola PostgreSQL CRUD APIs ---
 
 // GET Motorola repairs
-app.get('/api/admin/moto', checkAdminAuth, (req, res) => {
-  const data = readJsonFile(motoPath);
-  res.json(data);
+app.get('/api/admin/moto', checkAdminAuth, async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM moto_repairs ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching moto repairs:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // POST Motorola repair
-app.post('/api/admin/moto', checkAdminAuth, (req, res) => {
+app.post('/api/admin/moto', checkAdminAuth, async (req, res) => {
   const {
     device_model,
     issue_description,
@@ -287,83 +264,123 @@ app.post('/api/admin/moto', checkAdminAuth, (req, res) => {
     return res.status(400).json({ error: 'Device model, customer name, and phone are required' });
   }
 
-  const data = readJsonFile(motoPath);
-  const ticketId = generateTicketId('Motorola');
-  const newId = data.length > 0 ? Math.max(...data.map(r => r.id)) + 1 : 1;
-
-  const newRepair = {
-    id: newId,
-    ticket_id: ticketId,
-    brand: 'Motorola',
-    device_model,
-    issue_description: issue_description || '',
-    customer_name,
-    customer_email: customer_email || '',
-    customer_phone,
-    customer_address: customer_address || '',
-    service_type: service_type || 'Walk-in',
-    status: status || 'Received',
-    amount_collected: amount_collected !== undefined ? parseFloat(amount_collected) : 0.00,
-    warranty_status: warranty_status || 'Out of Warranty',
-    receiving_date: receiving_date || new Date().toISOString(),
-    giving_date: giving_date || null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-
-  data.push(newRepair);
-  writeJsonFile(motoPath, data);
-  res.status(201).json({ success: true, repair: newRepair });
+  try {
+    const ticketId = generateTicketId('Motorola');
+    const queryText = `
+      INSERT INTO moto_repairs (
+        ticket_id, brand, device_model, issue_description, customer_name, 
+        customer_email, customer_phone, customer_address, service_type, 
+        status, amount_collected, warranty_status, receiving_date, giving_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING *
+    `;
+    const values = [
+      ticketId,
+      'Motorola',
+      device_model,
+      issue_description || '',
+      customer_name,
+      customer_email || '',
+      customer_phone,
+      customer_address || '',
+      service_type || 'Walk-in',
+      status || 'Received',
+      amount_collected !== undefined ? parseFloat(amount_collected) : 0.00,
+      warranty_status || 'Out of Warranty',
+      parseDbDate(receiving_date) || new Date().toISOString(),
+      parseDbDate(giving_date)
+    ];
+    const result = await db.query(queryText, values);
+    res.status(201).json({ success: true, repair: result.rows[0] });
+  } catch (err) {
+    console.error('Error creating moto repair:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // PUT Motorola repair
-app.put('/api/admin/moto/:id', checkAdminAuth, (req, res) => {
+app.put('/api/admin/moto/:id', checkAdminAuth, async (req, res) => {
   const { id } = req.params;
-  const updates = req.body;
 
-  const data = readJsonFile(motoPath);
-  const idx = data.findIndex(r => r.id === parseInt(id));
+  try {
+    const getRes = await db.query('SELECT * FROM moto_repairs WHERE id = $1', [id]);
+    if (getRes.rowCount === 0) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    const existing = getRes.rows[0];
+    const merged = { ...existing, ...req.body };
 
-  if (idx === -1) {
-    return res.status(404).json({ error: 'Record not found' });
+    const queryText = `
+      UPDATE moto_repairs SET
+        device_model = $1,
+        issue_description = $2,
+        customer_name = $3,
+        customer_email = $4,
+        customer_phone = $5,
+        customer_address = $6,
+        service_type = $7,
+        status = $8,
+        amount_collected = $9,
+        warranty_status = $10,
+        receiving_date = $11,
+        giving_date = $12,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $13
+      RETURNING *
+    `;
+    const values = [
+      merged.device_model,
+      merged.issue_description,
+      merged.customer_name,
+      merged.customer_email,
+      merged.customer_phone,
+      merged.customer_address,
+      merged.service_type,
+      merged.status,
+      merged.amount_collected !== undefined ? parseFloat(merged.amount_collected) : 0.00,
+      merged.warranty_status,
+      parseDbDate(merged.receiving_date) || new Date().toISOString(),
+      parseDbDate(merged.giving_date),
+      id
+    ];
+    const result = await db.query(queryText, values);
+    res.json({ success: true, repair: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating moto repair:', err);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  data[idx] = {
-    ...data[idx],
-    ...updates,
-    amount_collected: updates.amount_collected !== undefined ? parseFloat(updates.amount_collected) : data[idx].amount_collected,
-    updated_at: new Date().toISOString()
-  };
-
-  writeJsonFile(motoPath, data);
-  res.json({ success: true, repair: data[idx] });
 });
 
 // DELETE Motorola repair
-app.delete('/api/admin/moto/:id', checkAdminAuth, (req, res) => {
+app.delete('/api/admin/moto/:id', checkAdminAuth, async (req, res) => {
   const { id } = req.params;
-  const data = readJsonFile(motoPath);
-  const idx = data.findIndex(r => r.id === parseInt(id));
-
-  if (idx === -1) {
-    return res.status(404).json({ error: 'Record not found' });
+  try {
+    const result = await db.query('DELETE FROM moto_repairs WHERE id = $1 RETURNING *', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    res.json({ success: true, deleted: result.rows[0] });
+  } catch (err) {
+    console.error('Error deleting moto repair:', err);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  const deleted = data.splice(idx, 1);
-  writeJsonFile(motoPath, data);
-  res.json({ success: true, deleted: deleted[0] });
 });
 
-// Non-Motorola JSON CRUD APIs
+// --- Non-Motorola (Laptop) PostgreSQL CRUD APIs ---
 
 // GET Non-Motorola repairs
-app.get('/api/admin/non-moto', checkAdminAuth, (req, res) => {
-  const data = readJsonFile(nonMotoPath);
-  res.json(data);
+app.get('/api/admin/non-moto', checkAdminAuth, async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM laptop_repairs ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching laptop repairs:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // POST Non-Motorola repair
-app.post('/api/admin/non-moto', checkAdminAuth, (req, res) => {
+app.post('/api/admin/non-moto', checkAdminAuth, async (req, res) => {
   const {
     brand,
     device_model,
@@ -384,169 +401,226 @@ app.post('/api/admin/non-moto', checkAdminAuth, (req, res) => {
     return res.status(400).json({ error: 'Brand, device model, customer name, and phone are required' });
   }
 
-  const data = readJsonFile(nonMotoPath);
-  const ticketId = generateTicketId(brand);
-  const newId = data.length > 0 ? Math.max(...data.map(r => r.id)) + 1 : 1;
-
-  const newRepair = {
-    id: newId,
-    ticket_id: ticketId,
-    brand,
-    device_model,
-    issue_description: issue_description || '',
-    customer_name,
-    customer_email: customer_email || '',
-    customer_phone,
-    customer_address: customer_address || '',
-    service_type: service_type || 'Walk-in',
-    status: status || 'Received',
-    amount_collected: amount_collected !== undefined ? parseFloat(amount_collected) : 0.00,
-    warranty_status: warranty_status || 'Out of Warranty',
-    receiving_date: receiving_date || new Date().toISOString(),
-    giving_date: giving_date || null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-
-  data.push(newRepair);
-  writeJsonFile(nonMotoPath, data);
-  res.status(201).json({ success: true, repair: newRepair });
+  try {
+    const ticketId = generateTicketId(brand);
+    const queryText = `
+      INSERT INTO laptop_repairs (
+        ticket_id, brand, device_model, issue_description, customer_name, 
+        customer_email, customer_phone, customer_address, service_type, 
+        status, amount_collected, warranty_status, receiving_date, giving_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      RETURNING *
+    `;
+    const values = [
+      ticketId,
+      brand,
+      device_model,
+      issue_description || '',
+      customer_name,
+      customer_email || '',
+      customer_phone,
+      customer_address || '',
+      service_type || 'Walk-in',
+      status || 'Received',
+      amount_collected !== undefined ? parseFloat(amount_collected) : 0.00,
+      warranty_status || 'Out of Warranty',
+      parseDbDate(receiving_date) || new Date().toISOString(),
+      parseDbDate(giving_date)
+    ];
+    const result = await db.query(queryText, values);
+    res.status(201).json({ success: true, repair: result.rows[0] });
+  } catch (err) {
+    console.error('Error creating laptop repair:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // PUT Non-Motorola repair
-app.put('/api/admin/non-moto/:id', checkAdminAuth, (req, res) => {
+app.put('/api/admin/non-moto/:id', checkAdminAuth, async (req, res) => {
   const { id } = req.params;
-  const updates = req.body;
 
-  const data = readJsonFile(nonMotoPath);
-  const idx = data.findIndex(r => r.id === parseInt(id));
+  try {
+    const getRes = await db.query('SELECT * FROM laptop_repairs WHERE id = $1', [id]);
+    if (getRes.rowCount === 0) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    const existing = getRes.rows[0];
+    const merged = { ...existing, ...req.body };
 
-  if (idx === -1) {
-    return res.status(404).json({ error: 'Record not found' });
+    const queryText = `
+      UPDATE laptop_repairs SET
+        brand = $1,
+        device_model = $2,
+        issue_description = $3,
+        customer_name = $4,
+        customer_email = $5,
+        customer_phone = $6,
+        customer_address = $7,
+        service_type = $8,
+        status = $9,
+        amount_collected = $10,
+        warranty_status = $11,
+        receiving_date = $12,
+        giving_date = $13,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $14
+      RETURNING *
+    `;
+    const values = [
+      merged.brand,
+      merged.device_model,
+      merged.issue_description,
+      merged.customer_name,
+      merged.customer_email,
+      merged.customer_phone,
+      merged.customer_address,
+      merged.service_type,
+      merged.status,
+      merged.amount_collected !== undefined ? parseFloat(merged.amount_collected) : 0.00,
+      merged.warranty_status,
+      parseDbDate(merged.receiving_date) || new Date().toISOString(),
+      parseDbDate(merged.giving_date),
+      id
+    ];
+    const result = await db.query(queryText, values);
+    res.json({ success: true, repair: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating laptop repair:', err);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  data[idx] = {
-    ...data[idx],
-    ...updates,
-    amount_collected: updates.amount_collected !== undefined ? parseFloat(updates.amount_collected) : data[idx].amount_collected,
-    updated_at: new Date().toISOString()
-  };
-
-  writeJsonFile(nonMotoPath, data);
-  res.json({ success: true, repair: data[idx] });
 });
 
 // DELETE Non-Motorola repair
-app.delete('/api/admin/non-moto/:id', checkAdminAuth, (req, res) => {
+app.delete('/api/admin/non-moto/:id', checkAdminAuth, async (req, res) => {
   const { id } = req.params;
-  const data = readJsonFile(nonMotoPath);
-  const idx = data.findIndex(r => r.id === parseInt(id));
-
-  if (idx === -1) {
-    return res.status(404).json({ error: 'Record not found' });
+  try {
+    const result = await db.query('DELETE FROM laptop_repairs WHERE id = $1 RETURNING *', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    res.json({ success: true, deleted: result.rows[0] });
+  } catch (err) {
+    console.error('Error deleting laptop repair:', err);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  const deleted = data.splice(idx, 1);
-  writeJsonFile(nonMotoPath, data);
-  res.json({ success: true, deleted: deleted[0] });
 });
 
-// Expenses JSON CRUD APIs
+// --- Expenses PostgreSQL CRUD APIs ---
 
 // GET Expenses
-app.get('/api/admin/expenses', checkAdminAuth, (req, res) => {
-  const data = readJsonFile(overallPath);
-  const expenses = data.expenses || [];
-  res.json(expenses);
+app.get('/api/admin/expenses', checkAdminAuth, async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM expenses ORDER BY expense_date DESC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching expenses:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // POST Expense
-app.post('/api/admin/expenses', checkAdminAuth, (req, res) => {
+app.post('/api/admin/expenses', checkAdminAuth, async (req, res) => {
   const { description, amount, expense_date } = req.body;
 
   if (!description || amount === undefined) {
     return res.status(400).json({ error: 'Description and amount are required' });
   }
 
-  const data = readJsonFile(overallPath);
-  if (!data.expenses) data.expenses = [];
-
-  const newId = data.expenses.length > 0 ? Math.max(...data.expenses.map(e => e.id)) + 1 : 1;
-  const newExpense = {
-    id: newId,
-    description,
-    amount: parseFloat(amount),
-    expense_date: expense_date || new Date().toISOString().split('T')[0],
-    created_at: new Date().toISOString()
-  };
-
-  data.expenses.push(newExpense);
-  writeJsonFile(overallPath, data);
-  res.status(201).json({ success: true, expense: newExpense });
+  try {
+    const queryText = `
+      INSERT INTO expenses (description, amount, expense_date)
+      VALUES ($1, $2, $3)
+      RETURNING *
+    `;
+    const values = [
+      description,
+      parseFloat(amount),
+      parseDbDate(expense_date) || new Date().toISOString().split('T')[0]
+    ];
+    const result = await db.query(queryText, values);
+    res.status(201).json({ success: true, expense: result.rows[0] });
+  } catch (err) {
+    console.error('Error creating expense:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // PUT Expense
-app.put('/api/admin/expenses/:id', checkAdminAuth, (req, res) => {
+app.put('/api/admin/expenses/:id', checkAdminAuth, async (req, res) => {
   const { id } = req.params;
-  const { description, amount, expense_date } = req.body;
 
-  const data = readJsonFile(overallPath);
-  if (!data.expenses) data.expenses = [];
+  try {
+    const getRes = await db.query('SELECT * FROM expenses WHERE id = $1', [id]);
+    if (getRes.rowCount === 0) {
+      return res.status(404).json({ error: 'Expense record not found' });
+    }
+    const existing = getRes.rows[0];
+    const merged = { ...existing, ...req.body };
 
-  const idx = data.expenses.findIndex(e => e.id === parseInt(id));
-  if (idx === -1) {
-    return res.status(404).json({ error: 'Expense record not found' });
+    const queryText = `
+      UPDATE expenses SET
+        description = $1,
+        amount = $2,
+        expense_date = $3
+      WHERE id = $4
+      RETURNING *
+    `;
+    const values = [
+      merged.description,
+      parseFloat(merged.amount),
+      parseDbDate(merged.expense_date) || new Date().toISOString().split('T')[0],
+      id
+    ];
+    const result = await db.query(queryText, values);
+    res.json({ success: true, expense: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating expense:', err);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  if (description !== undefined) data.expenses[idx].description = description;
-  if (amount !== undefined) data.expenses[idx].amount = parseFloat(amount);
-  if (expense_date !== undefined) data.expenses[idx].expense_date = expense_date;
-
-  writeJsonFile(overallPath, data);
-  res.json({ success: true, expense: data.expenses[idx] });
 });
 
 // DELETE Expense
-app.delete('/api/admin/expenses/:id', checkAdminAuth, (req, res) => {
+app.delete('/api/admin/expenses/:id', checkAdminAuth, async (req, res) => {
   const { id } = req.params;
-
-  const data = readJsonFile(overallPath);
-  if (!data.expenses) data.expenses = [];
-
-  const idx = data.expenses.findIndex(e => e.id === parseInt(id));
-  if (idx === -1) {
-    return res.status(404).json({ error: 'Expense record not found' });
+  try {
+    const result = await db.query('DELETE FROM expenses WHERE id = $1 RETURNING *', [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Expense record not found' });
+    }
+    res.json({ success: true, deleted: result.rows[0] });
+  } catch (err) {
+    console.error('Error deleting expense:', err);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  const deleted = data.expenses.splice(idx, 1);
-  writeJsonFile(overallPath, data);
-  res.json({ success: true, deleted: deleted[0] });
 });
 
-// GET Financial Overview (Summary of profits/losses)
-app.get('/api/admin/overview', checkAdminAuth, (req, res) => {
-  const motoData = readJsonFile(motoPath);
-  const nonMotoData = readJsonFile(nonMotoPath);
-  const overallData = readJsonFile(overallPath);
-  const expenses = overallData.expenses || [];
+// GET Financial Overview (Aggregates sum metrics from DB tables)
+app.get('/api/admin/overview', checkAdminAuth, async (req, res) => {
+  try {
+    const motoSumQuery = await db.query('SELECT COALESCE(SUM(amount_collected), 0) as total, COUNT(*) as count FROM moto_repairs');
+    const nonMotoSumQuery = await db.query('SELECT COALESCE(SUM(amount_collected), 0) as total, COUNT(*) as count FROM laptop_repairs');
+    const expensesSumQuery = await db.query('SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count FROM expenses');
 
-  // Calculate totals
-  const motoRevenue = motoData.reduce((sum, r) => sum + (parseFloat(r.amount_collected) || 0), 0);
-  const nonMotoRevenue = nonMotoData.reduce((sum, r) => sum + (parseFloat(r.amount_collected) || 0), 0);
-  const totalRevenue = motoRevenue + nonMotoRevenue;
-  const totalExpenses = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-  const netProfit = totalRevenue - totalExpenses;
+    const motoRevenue = parseFloat(motoSumQuery.rows[0].total);
+    const nonMotoRevenue = parseFloat(nonMotoSumQuery.rows[0].total);
+    const totalRevenue = motoRevenue + nonMotoRevenue;
+    const totalExpenses = parseFloat(expensesSumQuery.rows[0].total);
+    const netProfit = totalRevenue - totalExpenses;
 
-  res.json({
-    motoRevenue,
-    nonMotoRevenue,
-    totalRevenue,
-    totalExpenses,
-    netProfit,
-    motoCount: motoData.length,
-    nonMotoCount: nonMotoData.length,
-    expensesCount: expenses.length
-  });
+    res.json({
+      motoRevenue,
+      nonMotoRevenue,
+      totalRevenue,
+      totalExpenses,
+      netProfit,
+      motoCount: parseInt(motoSumQuery.rows[0].count),
+      nonMotoCount: parseInt(nonMotoSumQuery.rows[0].count),
+      expensesCount: parseInt(expensesSumQuery.rows[0].count)
+    });
+  } catch (err) {
+    console.error('Error generating financial overview:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
