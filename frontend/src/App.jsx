@@ -238,7 +238,7 @@ function Slideshow({ slides, onUploadSlide }) {
 function App() {
   const [activeTab, setActiveTab] = useState(() => {
     const path = window.location.pathname;
-    const adminRoutes = ['/admin', '/moto', '/non-moto', '/expenses', '/overview'];
+    const adminRoutes = ['/admin', '/moto', '/non-moto', '/expenses', '/overview', '/messages'];
     if (adminRoutes.includes(path)) {
       return path === '/admin' ? 'admin' : path.substring(1);
     }
@@ -277,7 +277,7 @@ function App() {
   useEffect(() => {
     const handleLocationChange = () => {
       const path = window.location.pathname;
-      const adminRoutes = ['/admin', '/moto', '/non-moto', '/expenses', '/overview'];
+      const adminRoutes = ['/admin', '/moto', '/non-moto', '/expenses', '/overview', '/messages'];
       if (adminRoutes.includes(path)) {
         setActiveTab(path === '/admin' ? 'admin' : path.substring(1));
       } else {
@@ -285,7 +285,7 @@ function App() {
         if (isDirectRoute) {
           setActiveTab('track');
         } else {
-          const adminTabs = ['admin', 'moto', 'non-moto', 'expenses', 'overview'];
+          const adminTabs = ['admin', 'moto', 'non-moto', 'expenses', 'overview', 'messages'];
           setActiveTab((prev) => adminTabs.includes(prev) ? 'home' : prev);
         }
       }
@@ -297,7 +297,7 @@ function App() {
   // Update path on tab selection
   useEffect(() => {
     const path = window.location.pathname;
-    const adminTabs = ['admin', 'moto', 'non-moto', 'expenses', 'overview'];
+    const adminTabs = ['admin', 'moto', 'non-moto', 'expenses', 'overview', 'messages'];
     
     if (adminTabs.includes(activeTab)) {
       const targetPath = activeTab === 'admin' ? '/admin' : `/${activeTab}`;
@@ -382,7 +382,7 @@ function App() {
         {activeTab === 'book' && <BookRepairView />}
         {activeTab === 'track' && <TrackStatusView setHideCallBubble={setHideCallBubble} />}
         {activeTab === 'contact' && <ContactView />}
-        {['admin', 'moto', 'non-moto', 'expenses', 'overview'].includes(activeTab) && (
+        {['admin', 'moto', 'non-moto', 'expenses', 'overview', 'messages'].includes(activeTab) && (
           <AdminView activeSection={activeTab} setActiveSection={setActiveTab} />
         )}
       </main>
