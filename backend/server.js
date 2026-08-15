@@ -646,6 +646,76 @@ app.get('/api/backup', async (req, res) => {
   }
 });
 
+// Helper function to convert JSON objects to CSV string
+const jsonToCsv = (jsonArray) => {
+  if (!jsonArray || jsonArray.length === 0) return '';
+  const headers = Object.keys(jsonArray[0]);
+  const csvRows = [headers.join(',')];
+  
+  for (const row of jsonArray) {
+    const values = headers.map(header => {
+      const val = row[header];
+      if (val === null || val === undefined) return '';
+      const escaped = String(val).replace(/"/g, '""');
+      return escaped.includes(',') || escaped.includes('\n') || escaped.includes('"')
+        ? `"${escaped}"`
+        : escaped;
+    });
+    csvRows.push(values.join(','));
+  }
+  return csvRows.join('\n');
+};
+
+// Admin backup auth checker (allows query param fallback for direct browser download)
+const checkBackupAuth = (req, res, next) => {
+  const authPass = req.headers['x-admin-password'] || req.query.password;
+  if (authPass === ADMIN_PASSWORD) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Unauthorized: Invalid admin password' });
+  }
+};
+
+// 10. GET Download entire database as JSON
+app.get('/api/admin/backup/download/json', checkBackupAuth, async (req, res) => {
+  try {
+    const backupData = await backupService.getBackupData();
+    const dateStr = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Disposition', `attachment; filename="database_backup_${dateStr}.json"`);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify(backupData, null, 2));
+  } catch (err) {
+    console.error('Error exporting backup to JSON:', err);
+    res.status(500).json({ error: 'Failed to export backup to JSON' });
+  }
+});
+
+// 11. GET Download specific database table as CSV
+app.get('/api/admin/backup/download/csv', checkBackupAuth, async (req, res) => {
+  const { table } = req.query;
+  const validTables = ['repairs', 'contacts', 'moto_repairs', 'laptop_repairs', 'expenses'];
+
+  if (!table || !validTables.includes(table)) {
+    return res.status(400).json({ 
+      error: `Invalid table name. Must be one of: ${validTables.join(', ')}` 
+    });
+  }
+
+  try {
+    const backupData = await backupService.getBackupData();
+    const tableData = backupData.tables[table];
+    const csvContent = jsonToCsv(tableData);
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    res.setHeader('Content-Disposition', `attachment; filename="${table}_backup_${dateStr}.csv"`);
+    res.setHeader('Content-Type', 'text/csv');
+    res.send(csvContent);
+  } catch (err) {
+    console.error(`Error exporting table ${table} to CSV:`, err);
+    res.status(500).json({ error: `Failed to export table ${table} to CSV` });
+  }
+});
+
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
