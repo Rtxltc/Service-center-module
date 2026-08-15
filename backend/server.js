@@ -223,16 +223,12 @@ app.get('/api/admin/contacts', checkAdminAuth, async (req, res) => {
   }
 });
 
-// Helper to safely parse dates for PostgreSQL (converts empty/whitespace strings to null)
 const parseDbDate = (val) => {
   if (val === undefined || val === null) return null;
   const s = String(val).trim();
   return s === '' ? null : s;
 };
 
-// --- Motorola PostgreSQL CRUD APIs ---
-
-// GET Motorola repairs
 app.get('/api/admin/moto', checkAdminAuth, async (req, res) => {
   try {
     const result = await db.query('SELECT * FROM moto_repairs ORDER BY created_at DESC');

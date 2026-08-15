@@ -8,13 +8,57 @@ const dbName = process.env.PGDATABASE || 'motorola_laptop_service';
 async function init() {
   console.log('Initializing database...');
 
-  // 1. Try to create the database if it doesn't exist
-  // We connect to standard 'postgres' db first to run CREATE DATABASE
+  const db = require('./db');
+
+  // If Supabase is configured, use Supabase initialization flow
+  if (db.isSupabase) {
+    console.log('⚡ Using Supabase client connection.');
+    try {
+      console.log('Checking if repairs table is created in Supabase...');
+      const checkRepairs = await db.query('SELECT COUNT(*) FROM repairs');
+      
+      const count = parseInt(checkRepairs.rows[0].count);
+      console.log(`repairs table verified. Current record count: ${count}`);
+
+      if (count === 0) {
+        console.log('Inserting seed repair record for testing...');
+        const seedTicket = 'MOTO-8302';
+        await db.query(
+          `INSERT INTO repairs (ticket_id, brand, device_model, issue_description, customer_name, customer_email, customer_phone, service_type, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [seedTicket, 'Motorola', 'Moto Edge 50 Ultra', 'Broken display glass and back cover replacement.', 'Yash Sharma', 'yash.sharma@example.com', '8795427739', 'Walk-in', 'Diagnosis']
+        );
+        console.log(`✅ Seed record created successfully. Ticket ID: ${seedTicket}`);
+      } else {
+        console.log('Database tables already seeded. Skipping seed record.');
+      }
+      
+      console.log('🎉 Supabase initialization check completed successfully!');
+    } catch (err) {
+      if (err.code === '42P01' || err.code === 'PGRST205' || (err.message && (err.message.includes('does not exist') || err.message.includes('schema cache')))) {
+        console.error('\n❌ ERROR: Supabase tables do not exist yet.');
+        console.error('👉 Action Required:');
+        console.error('   1. Open your Supabase Dashboard SQL Editor.');
+        console.error(`   2. Copy the contents of the backend/schema.sql file.`);
+        console.error('   3. Run the SQL query to create the tables.');
+        console.error('   4. Run this script (node db-init.js) again to insert seed data.\n');
+      } else {
+        console.error('❌ Error testing connection or inserting seed record on Supabase:', err);
+      }
+      process.exit(1);
+    } finally {
+      await db.pool.end();
+      console.log('Init script completed.');
+    }
+    return;
+  }
+
+  // --- Legacy PostgreSQL initialization flow (runs if Supabase is not configured) ---
+  console.log('⚡ Using standard PostgreSQL connection.');
   const connectionString = process.env.DATABASE_URL;
   let masterConfig;
 
   if (connectionString) {
-    // If connection string is provided, try to extract host/port/credentials and connect to standard postgres first
     masterConfig = {
       connectionString: connectionString.replace(/\/[^/]+$/, '/postgres'),
     };
@@ -36,7 +80,6 @@ async function init() {
     const res = await client.query(`SELECT 1 FROM pg_database WHERE datname = $1`, [dbName]);
     if (res.rowCount === 0) {
       console.log(`Database "${dbName}" does not exist. Creating...`);
-      // CREATE DATABASE cannot be executed inside a transaction block, pg handles it
       await client.query(`CREATE DATABASE ${dbName}`);
       console.log(`Database "${dbName}" created successfully.`);
       dbCreated = true;
@@ -51,8 +94,6 @@ async function init() {
     } catch (e) { }
   }
 
-  // 2. Connect to the target database and apply schema
-  const db = require('./db');
   try {
     const schemaPath = path.join(__dirname, 'schema.sql');
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
