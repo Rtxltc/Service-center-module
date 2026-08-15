@@ -47,7 +47,9 @@ async function init() {
       }
       process.exit(1);
     } finally {
-      await db.pool.end();
+      if (db.pool) {
+        await db.pool.end();
+      }
       console.log('Init script completed.');
     }
     return;
@@ -118,8 +120,11 @@ async function init() {
     console.error('Error applying schema:', err);
     process.exit(1);
   } finally {
-    await db.pool.end();
-    console.log('Database connection pool closed. Init script completed.');
+    if (db.pool) {
+      await db.pool.end();
+      console.log('Database connection pool closed.');
+    }
+    console.log('Init script completed.');
   }
 }
 
