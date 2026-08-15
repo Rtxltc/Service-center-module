@@ -619,9 +619,44 @@ app.get('/api/admin/overview', checkAdminAuth, async (req, res) => {
   }
 });
 
+const backupService = require('./backup-service');
+
+// 9. Database Backup Endpoint (triggered by Cron / manual request)
+app.get('/api/backup', async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  
+  // If CRON_SECRET is configured, enforce Bearer authorization header check
+  if (cronSecret) {
+    const authHeader = req.headers.authorization;
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
+
+  const result = await backupService.runBackup();
+  if (result.success) {
+    res.json({ 
+      success: true, 
+      message: 'Backup successfully sent to Discord', 
+      filename: result.filename, 
+      summary: result.summary 
+    });
+  } else {
+    res.status(500).json({ error: 'Backup failed', details: result.error });
+  }
+});
+
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    
+    // Set up local 24-hour backup interval scheduler
+    const BACKUP_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+    console.log('⏰ Local backup scheduler initialized. Backup will run every 24 hours.');
+    setInterval(async () => {
+      console.log('⏰ Running automated scheduled database backup...');
+      await backupService.runBackup();
+    }, BACKUP_INTERVAL);
   });
 }
 
