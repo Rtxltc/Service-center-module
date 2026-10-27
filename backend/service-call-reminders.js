@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const RECIPIENT = 'charom.ram.ayodhya@gmail.com';
+const RECIPIENT = 'akavanshu@gmail.com';
 const SENDER_NAME = 'Charom Helper Automation';
 const MAX_SOIN_LENGTH = 100;
 
@@ -81,15 +81,10 @@ const getEmailConfiguration = () => {
   };
 };
 
-const buildReminderEmail = (call, emailStage, token, appUrl) => {
-  const isFollowUp = emailStage === 2;
-  const subject = isFollowUp
-    ? `TAT missed follow-up: SOIN ${call.soin}`
-    : `47-hour reminder: update SOIN ${call.soin}`;
-  const heading = isFollowUp ? 'TAT missed — follow-up needed' : '47-hour service-call reminder';
-  const intro = isFollowUp
-    ? 'One hour has passed since the 47-hour reminder and the SOIN is still unchanged.'
-    : 'The 47-hour service-call turnaround time has passed. Please update the SOIN.';
+const buildReminderEmail = (call, token, appUrl) => {
+  const subject = `47-hour reminder: update SOIN ${call.soin}`;
+  const heading = '47-hour service-call reminder';
+  const intro = 'The 47-hour service-call turnaround time has passed. Please update the SOIN.';
   const updateUrl = `${appUrl}/api/service-calls/email-update/${token}`;
   const details = [
     ['SOIN', call.soin],
@@ -115,15 +110,15 @@ const buildReminderEmail = (call, emailStage, token, appUrl) => {
   };
 };
 
-const sendResendEmail = async (configuration, call, emailStage, token) => {
-  const message = buildReminderEmail(call, emailStage, token, configuration.appUrl);
+const sendResendEmail = async (configuration, call, token) => {
+  const message = buildReminderEmail(call, token, configuration.appUrl);
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     signal: AbortSignal.timeout(10000),
     headers: {
       Authorization: `Bearer ${configuration.apiKey}`,
       'Content-Type': 'application/json',
-      'Idempotency-Key': `service-call-${call.id}-cycle-${call.reminder_cycle}-stage-${emailStage}`
+      'Idempotency-Key': `service-call-${call.id}-cycle-${call.reminder_cycle}-stage-1`
     },
     body: JSON.stringify({
       from: configuration.from,
@@ -182,15 +177,13 @@ const registerServiceCallReminderRoutes = (app, db) => {
     let sent = 0;
     const failures = [];
     for (const call of dueCalls) {
-      const emailStage = Number(call.reminder_stage) + 1;
       const token = createActionToken(call.id, call.reminder_cycle, configuration.actionSecret);
       try {
-        await sendResendEmail(configuration, call, emailStage, token);
+        await sendResendEmail(configuration, call, token);
         await db.serviceCalls.completeReminder(
           call.id,
           call.reminder_cycle,
-          call.reminder_stage,
-          new Date().toISOString()
+          call.reminder_stage
         );
         sent += 1;
       } catch (error) {

@@ -977,10 +977,8 @@ const serviceCalls = {
       const now = Date.now();
       const staleClaim = now - 10 * 60 * 1000;
       const claimed = (data.service_calls || []).filter(call => {
-        const due = call.reminder_stage === 0
-          ? new Date(call.relog_due_at).getTime() <= now
-          : call.reminder_stage === 1
-            && new Date(call.first_reminder_sent_at).getTime() <= now - 60 * 60 * 1000;
+        const due = Number(call.reminder_stage || 0) === 0
+          && new Date(call.relog_due_at).getTime() <= now;
         const claimExpired = !call.reminder_claimed_at
           || new Date(call.reminder_claimed_at).getTime() < staleClaim;
         return due && claimExpired;
@@ -994,13 +992,12 @@ const serviceCalls = {
     return result.rows;
   },
 
-  async completeReminder(id, cycle, stage, sentAt) {
+  async completeReminder(id, cycle, stage) {
     const update = {
-      reminder_stage: Number(stage) + 1,
+      reminder_stage: 1,
       mail_sent: true,
       reminder_claimed_at: null
     };
-    if (Number(stage) === 0) update.first_reminder_sent_at = sentAt;
     if (useSupabase) {
       let query = supabase.from('service_calls').update(update)
         .eq('id', id).eq('reminder_cycle', cycle).eq('reminder_stage', stage)
@@ -1019,11 +1016,10 @@ const serviceCalls = {
       writeMockData(data);
       return true;
     }
-    const values = [id, cycle, stage, sentAt];
+    const values = [id, cycle, stage];
     const result = await pool.query(
       `UPDATE service_calls
-          SET reminder_stage = reminder_stage + 1,
-              first_reminder_sent_at = CASE WHEN reminder_stage = 0 THEN $4::timestamptz ELSE first_reminder_sent_at END,
+          SET reminder_stage = 1,
               mail_sent = TRUE,
               reminder_claimed_at = NULL
         WHERE id = $1 AND reminder_cycle = $2 AND reminder_stage = $3

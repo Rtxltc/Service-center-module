@@ -17,7 +17,7 @@ test('email SOIN action token is signed and bound to a reminder cycle', () => {
   assert.equal(readActionToken('not-a-token', secret), null);
 });
 
-test('reminder email content distinguishes the 47-hour reminder and TAT follow-up', () => {
+test('reminder email sends one 47-hour reminder with an escaped SOIN update link', () => {
   const call = {
     id: 7,
     reminder_cycle: 2,
@@ -27,15 +27,14 @@ test('reminder email content distinguishes the 47-hour reminder and TAT follow-u
     submission_at: '2026-10-27T05:45:00.000Z',
     relog_due_at: '2026-10-29T04:45:00.000Z'
   };
-  const first = buildReminderEmail(call, 1, 'signed-token', 'https://api.example.com');
-  const followUp = buildReminderEmail(call, 2, 'signed-token', 'https://api.example.com');
+  const email = buildReminderEmail(call, 'signed-token', 'https://api.example.com');
 
-  assert.match(first.subject, /47-hour reminder/);
-  assert.match(first.html, /&lt;SOIN&amp;&gt;/);
-  assert.match(first.html, /Moto &lt;Edge&gt;/);
-  assert.match(first.html, /https:\/\/api\.example\.com\/api\/service-calls\/email-update\/signed-token/);
-  assert.match(followUp.subject, /TAT missed follow-up/);
-  assert.match(followUp.text, /One hour has passed/);
+  assert.match(email.subject, /47-hour reminder/);
+  assert.match(email.html, /&lt;SOIN&amp;&gt;/);
+  assert.match(email.html, /Moto &lt;Edge&gt;/);
+  assert.match(email.html, /https:\/\/api\.example\.com\/api\/service-calls\/email-update\/signed-token/);
+  assert.doesNotMatch(email.subject, /follow-up/);
+  assert.doesNotMatch(email.text, /One hour has passed/);
 });
 
 test('phone submission timestamp is the source of the exact 47-hour deadline', () => {

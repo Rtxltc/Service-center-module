@@ -4,10 +4,10 @@
 
 The admin portal includes a Service Calls module backed by the existing Express API and PostgreSQL/Supabase database. Before starting the updated backend, apply these migrations in order to the existing database:
 
-- PostgreSQL: `psql "$DATABASE_URL" -f backend/migrations/001_service_calls.sql`, then `psql "$DATABASE_URL" -f backend/migrations/002_service_call_email_reminders.sql`
-- Supabase: run both SQL files, in order, in the project's SQL Editor.
+- PostgreSQL: `psql "$DATABASE_URL" -f backend/migrations/001_service_calls.sql`, followed by migrations `002_service_call_email_reminders.sql` and `003_single_service_call_reminder.sql` in order.
+- Supabase: run all three SQL files, in order, in the project's SQL Editor.
 
-The first migration creates the service-call and SOIN audit tables, indexes, the 47-hour deadline trigger, and the atomic SOIN update function. The second adds reminder scheduling and secure email SOIN updates. Existing service calls are not automatically emailed after the second migration; new calls start the automation. Neither migration modifies repair, income, expense, or contact records. Do not apply them to a different database than the one configured for the backend.
+The first migration creates the service-call and SOIN audit tables, indexes, the 47-hour deadline trigger, and the atomic SOIN update function. The second adds reminder scheduling and secure email SOIN updates. The third limits the automation to one email per SOIN cycle. Existing service calls are not automatically emailed when reminders are first enabled. These migrations do not modify repair, income, expense, or contact records. Do not apply them to a different database than the one configured for the backend.
 
 For Supabase deployments, configure `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_KEY`) as the server-only service-role key. Row-level security is enabled on the new service-call tables without public policies, so the publishable/anon key cannot read or modify service calls directly. Never put the service-role key in the frontend.
 
@@ -32,6 +32,8 @@ The backend sends email through Resend to `charom.ram.ayodhya@gmail.com` using t
 - `EMAIL_ACTION_SECRET`: at least 32 characters of random secret data; keep it private.
 - `CRON_SECRET`: at least 32 characters of random secret data used to authorize the scheduled reminder endpoint.
 
-The scheduled job checks due reminders every minute. Deploy on a Vercel plan that supports a one-minute Cron schedule, and configure the same `CRON_SECRET` in the deployment environment. The first reminder is sent 47 hours after the entered phone-submission date/time. If SOIN is unchanged, one TAT-missed follow-up is sent one hour after the first email; reminders then pause. The email button opens a secure form to enter the new SOIN. A successful SOIN change is added to the audit history and starts a fresh 47-hour timer. The phone-submission timestamp remains unchanged.
+Vercel Hobby does not support a one-minute Cron schedule, so the backend does not use Vercel Cron for reminders. Configure an external scheduler (for example, cron-job.org) to make a `GET` request every minute to `https://<your-backend-host>/api/service-calls/reminders`, with the HTTP header `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET` in both the backend deployment environment and the scheduler, using the same value. Keep the secret in the scheduler's header configuration, not in the request URL. The separate daily database-backup cron remains on Vercel.
+
+The single reminder is sent after the entered phone-submission date/time plus 47 hours. The scheduler checks once per minute, so actual delivery can be slightly later than the exact deadline. No additional reminder is sent until SOIN is updated. The email button opens a secure form to enter the new SOIN. A successful SOIN change is added to the audit history and starts a fresh 47-hour timer. The phone-submission timestamp remains unchanged.
 
 `mail_sent` indicates whether the first reminder for the current SOIN cycle has been sent; it is updated automatically and is not an email-send control.

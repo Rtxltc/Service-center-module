@@ -355,7 +355,7 @@ function ServiceCalls({ apiBase, password }) {
       <div className="service-calls-heading">
         <div>
           <h3>Service Calls</h3>
-          <p>Register calls, monitor the 47-hour turnaround, and send automatic email reminders with a one-hour TAT-missed follow-up.</p>
+          <p>Register calls, monitor the 47-hour turnaround, and send one automatic email reminder after the deadline.</p>
         </div>
         <div className="service-calls-heading-actions">
           <button className="btn btn-secondary" onClick={() => setView('dashboard')}>Dashboard</button>
