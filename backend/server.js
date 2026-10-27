@@ -16,6 +16,7 @@ app.use(cors({
   exposedHeaders: ['Content-Disposition']
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 // Helper function to generate unique Ticket ID
 const generateTicketId = (brand) => {
@@ -41,6 +42,7 @@ const checkAdminAuth = (req, res, next) => {
 };
 
 require('./service-calls')(app, db, checkAdminAuth);
+require('./service-call-reminders').registerServiceCallReminderRoutes(app, db);
 
 // 1. Health check
 app.get('/api/health', (req, res) => {

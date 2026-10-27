@@ -965,6 +965,99 @@ const serviceCalls = {
     return result.rows[0] || null;
   },
 
+  async claimDueReminders() {
+    if (useSupabase) {
+      const { data, error } = await supabase.rpc('claim_due_service_call_reminders', { p_limit: 50 });
+      if (error) throw error;
+      return data || [];
+    }
+    await testConnection();
+    if (!usePG) {
+      const data = readMockData();
+      const now = Date.now();
+      const staleClaim = now - 10 * 60 * 1000;
+      const claimed = (data.service_calls || []).filter(call => {
+        const due = call.reminder_stage === 0
+          ? new Date(call.relog_due_at).getTime() <= now
+          : call.reminder_stage === 1
+            && new Date(call.first_reminder_sent_at).getTime() <= now - 60 * 60 * 1000;
+        const claimExpired = !call.reminder_claimed_at
+          || new Date(call.reminder_claimed_at).getTime() < staleClaim;
+        return due && claimExpired;
+      }).slice(0, 50);
+      const claimedAt = new Date(now).toISOString();
+      claimed.forEach(call => { call.reminder_claimed_at = claimedAt; });
+      writeMockData(data);
+      return claimed;
+    }
+    const result = await pool.query('SELECT * FROM claim_due_service_call_reminders($1)', [50]);
+    return result.rows;
+  },
+
+  async completeReminder(id, cycle, stage, sentAt) {
+    const update = {
+      reminder_stage: Number(stage) + 1,
+      mail_sent: true,
+      reminder_claimed_at: null
+    };
+    if (Number(stage) === 0) update.first_reminder_sent_at = sentAt;
+    if (useSupabase) {
+      let query = supabase.from('service_calls').update(update)
+        .eq('id', id).eq('reminder_cycle', cycle).eq('reminder_stage', stage)
+        .not('reminder_claimed_at', 'is', null).select('id');
+      const { data, error } = await query.maybeSingle();
+      if (error) throw error;
+      return Boolean(data);
+    }
+    await testConnection();
+    if (!usePG) {
+      const data = readMockData();
+      const call = (data.service_calls || []).find(item => String(item.id) === String(id));
+      if (!call || Number(call.reminder_cycle || 0) !== Number(cycle)
+        || Number(call.reminder_stage || 0) !== Number(stage) || !call.reminder_claimed_at) return false;
+      Object.assign(call, update);
+      writeMockData(data);
+      return true;
+    }
+    const values = [id, cycle, stage, sentAt];
+    const result = await pool.query(
+      `UPDATE service_calls
+          SET reminder_stage = reminder_stage + 1,
+              first_reminder_sent_at = CASE WHEN reminder_stage = 0 THEN $4::timestamptz ELSE first_reminder_sent_at END,
+              mail_sent = TRUE,
+              reminder_claimed_at = NULL
+        WHERE id = $1 AND reminder_cycle = $2 AND reminder_stage = $3
+          AND reminder_claimed_at IS NOT NULL
+        RETURNING id`,
+      values
+    );
+    return result.rowCount > 0;
+  },
+
+  async releaseReminderClaim(id, cycle, stage) {
+    if (useSupabase) {
+      const { error } = await supabase.from('service_calls').update({ reminder_claimed_at: null })
+        .eq('id', id).eq('reminder_cycle', cycle).eq('reminder_stage', stage);
+      if (error) throw error;
+      return;
+    }
+    await testConnection();
+    if (!usePG) {
+      const data = readMockData();
+      const call = (data.service_calls || []).find(item => String(item.id) === String(id));
+      if (call && Number(call.reminder_cycle || 0) === Number(cycle)
+        && Number(call.reminder_stage || 0) === Number(stage)) {
+        call.reminder_claimed_at = null;
+        writeMockData(data);
+      }
+      return;
+    }
+    await pool.query(
+      'UPDATE service_calls SET reminder_claimed_at = NULL WHERE id = $1 AND reminder_cycle = $2 AND reminder_stage = $3',
+      [id, cycle, stage]
+    );
+  },
+
   async create(record) {
     if (useSupabase) {
       const { data, error } = await supabase.from('service_calls').insert(record).select().single();
@@ -985,6 +1078,10 @@ const serviceCalls = {
         id: data.service_calls.reduce((max, call) => Math.max(max, Number(call.id) || 0), 0) + 1,
         ...record,
         relog_due_at: new Date(new Date(record.submission_at).getTime() + 47 * 60 * 60 * 1000).toISOString(),
+        reminder_stage: 0,
+        reminder_cycle: 0,
+        first_reminder_sent_at: null,
+        reminder_claimed_at: null,
         created_at: now,
         updated_at: now
       };
@@ -1018,10 +1115,18 @@ const serviceCalls = {
         error.code = '23505';
         throw error;
       }
+      const submissionChanged = new Date(call.submission_at).getTime() !== new Date(record.submission_at).getTime();
       Object.assign(call, record, {
         relog_due_at: new Date(new Date(record.submission_at).getTime() + 47 * 60 * 60 * 1000).toISOString(),
         updated_at: new Date().toISOString()
       });
+      if (submissionChanged) {
+        call.reminder_stage = 0;
+        call.reminder_cycle = Number(call.reminder_cycle || 0) + 1;
+        call.first_reminder_sent_at = null;
+        call.reminder_claimed_at = null;
+        call.mail_sent = false;
+      }
       writeMockData(data);
       return call;
     }
@@ -1070,6 +1175,12 @@ const serviceCalls = {
         reason: reason || null
       };
       call.soin = soin;
+      call.relog_due_at = new Date(Date.now() + 47 * 60 * 60 * 1000).toISOString();
+      call.reminder_stage = 0;
+      call.reminder_cycle = Number(call.reminder_cycle || 0) + 1;
+      call.first_reminder_sent_at = null;
+      call.reminder_claimed_at = null;
+      call.mail_sent = false;
       call.updated_by = administratorId;
       call.updated_at = history.changed_at;
       data.service_call_soin_history.push(history);
@@ -1086,7 +1197,18 @@ const serviceCalls = {
         return null;
       }
       const updated = await client.query(
-        'UPDATE service_calls SET soin = $1, updated_by = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+        `UPDATE service_calls
+            SET soin = $1,
+                relog_due_at = CURRENT_TIMESTAMP + INTERVAL '47 hours',
+                reminder_stage = 0,
+                reminder_cycle = reminder_cycle + 1,
+                first_reminder_sent_at = NULL,
+                reminder_claimed_at = NULL,
+                mail_sent = FALSE,
+                updated_by = $2,
+                updated_at = CURRENT_TIMESTAMP
+          WHERE id = $3
+          RETURNING *`,
         [soin, administratorId, id]
       );
       const history = await client.query(
@@ -1102,6 +1224,61 @@ const serviceCalls = {
     } finally {
       client.release();
     }
+  },
+
+  async updateSoinFromEmail(id, cycle, soin) {
+    if (useSupabase) {
+      const { data, error } = await supabase.rpc('update_service_call_soin_from_email', {
+        p_id: id,
+        p_cycle: cycle,
+        p_soin: soin
+      });
+      if (error) throw error;
+      return data;
+    }
+    await testConnection();
+    if (!usePG) {
+      const data = readMockData();
+      data.service_calls = data.service_calls || [];
+      data.service_call_soin_history = data.service_call_soin_history || [];
+      const call = data.service_calls.find(item => String(item.id) === String(id));
+      if (!call || Number(call.reminder_cycle || 0) !== Number(cycle)
+        || Number(call.reminder_stage || 0) < 1 || call.soin === soin) return null;
+      if (data.service_calls.some(item => item.id !== call.id && item.soin.toLowerCase() === soin.toLowerCase())) {
+        const error = new Error('Duplicate SOIN');
+        error.code = '23505';
+        throw error;
+      }
+      const changedAt = new Date().toISOString();
+      const history = {
+        id: data.service_call_soin_history.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0) + 1,
+        service_call_id: call.id,
+        previous_soin: call.soin,
+        new_soin: soin,
+        administrator_id: 'email',
+        changed_at: changedAt,
+        reason: 'Updated using the service-call reminder email'
+      };
+      Object.assign(call, {
+        soin,
+        relog_due_at: new Date(Date.now() + 47 * 60 * 60 * 1000).toISOString(),
+        reminder_stage: 0,
+        reminder_cycle: Number(call.reminder_cycle || 0) + 1,
+        first_reminder_sent_at: null,
+        reminder_claimed_at: null,
+        mail_sent: false,
+        updated_by: 'email',
+        updated_at: changedAt
+      });
+      data.service_call_soin_history.push(history);
+      writeMockData(data);
+      return { call, history };
+    }
+    const result = await pool.query(
+      'SELECT update_service_call_soin_from_email($1, $2, $3) AS result',
+      [id, cycle, soin]
+    );
+    return result.rows[0].result;
   },
 
   async history(id) {

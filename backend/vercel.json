@@ -16,6 +16,10 @@
     {
       "path": "/api/backup",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/service-calls/reminders",
+      "schedule": "* * * * *"
     }
   ]
 }

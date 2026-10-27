@@ -249,7 +249,7 @@ function ServiceCalls({ apiBase, password }) {
       const historyResponse = await request(`/service-calls/${selectedCall.id}/history`);
       setHistory(await historyResponse.json());
       setSoinModalOpen(false);
-      setNotice('SOIN updated and recorded in history.');
+      setNotice('SOIN updated, recorded in history, and the 47-hour reminder timer restarted.');
       if (view === 'list') await loadCalls();
     } catch (reason) {
       showError(reason);
@@ -355,7 +355,7 @@ function ServiceCalls({ apiBase, password }) {
       <div className="service-calls-heading">
         <div>
           <h3>Service Calls</h3>
-          <p>Register calls, monitor 47-hour turnaround, and export reports.</p>
+          <p>Register calls, monitor the 47-hour turnaround, and send automatic email reminders with a one-hour TAT-missed follow-up.</p>
         </div>
         <div className="service-calls-heading-actions">
           <button className="btn btn-secondary" onClick={() => setView('dashboard')}>Dashboard</button>
@@ -474,7 +474,7 @@ function ServiceCalls({ apiBase, password }) {
             <label>Call type<select className="form-input" value={form.call_type} onChange={event => setForm({ ...form, call_type: event.target.value })}><option>Hardware</option><option>Software</option></select></label>
             <label>Part order status<select className="form-input" value={form.part_order_status} onChange={event => setForm({ ...form, part_order_status: event.target.value })}><option>Not Yet Ordered</option><option>Ordered</option></select></label>
             <label>Submission date and time<input className="form-input" type="datetime-local" value={form.submission_at} onChange={event => setForm({ ...form, submission_at: event.target.value })} required /></label>
-            <label className="service-call-checkbox"><input type="checkbox" checked={form.mail_sent} onChange={event => setForm({ ...form, mail_sent: event.target.checked })} /> Mail sent (does not send an email)</label>
+            <label className="service-call-checkbox"><input type="checkbox" checked={form.mail_sent} disabled readOnly /> Reminder email sent automatically</label>
           </div>
           <label>Issue description<textarea className="form-input" rows="4" value={form.issue_description} onChange={event => setForm({ ...form, issue_description: event.target.value })} maxLength="10000" required /></label>
           {form.warranty_status === 'Out of Warranty' && (
