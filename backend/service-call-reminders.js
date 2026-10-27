@@ -60,8 +60,8 @@ const getEmailConfiguration = () => {
     throw new Error('RESEND_FROM_EMAIL must be a verified sender email address.');
   }
   if (actionSecret.length < 32) throw new Error('EMAIL_ACTION_SECRET must be at least 32 characters long.');
-  if (process.env.PORN_SECRET && process.env.PORN_SECRET.length < 32) {
-    throw new Error('PORN_SECRET must be at least 32 characters long.');
+  if (process.env.CRON_SECRET && process.env.CRON_SECRET.length < 32) {
+    throw new Error('CRON_SECRET must be at least 32 characters long.');
   }
   let parsedUrl;
   try {
@@ -149,8 +149,8 @@ const sendNoStorePage = (res, status, title, body) => res
 
 const registerServiceCallReminderRoutes = (app, db) => {
   app.get('/api/service-calls/reminders', async (req, res) => {
-    const cronSecret = process.env.PORN_SECRET;
-    if (!cronSecret) return res.status(503).json({ error: 'PORN_SECRET is not configured.' });
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) return res.status(503).json({ error: 'CRON_SECRET is not configured.' });
     const authorization = req.get('authorization') || '';
     const expected = Buffer.from(`Bearer ${cronSecret}`);
     const supplied = Buffer.from(authorization);
