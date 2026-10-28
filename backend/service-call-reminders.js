@@ -151,7 +151,7 @@ const registerServiceCallReminderRoutes = (app, db) => {
   app.get('/api/service-calls/reminders', async (req, res) => {
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) return res.status(503).json({ error: 'CRON_SECRET is not configured.' });
-    const authorization = req.get('authorization') || '';
+    const authorization = req.get('Authorization') || '';
     const expected = Buffer.from(`Bearer ${cronSecret}`);
     const supplied = Buffer.from(authorization);
     if (expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) {
