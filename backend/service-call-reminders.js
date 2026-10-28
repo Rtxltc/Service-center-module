@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const RECIPIENT = 'akavanshu@gmail.com';
+const RECIPIENT = 'gyashu428@gmail.com';
 const SENDER_NAME = 'Charom Helper Automation';
 const MAX_SOIN_LENGTH = 100;
 
