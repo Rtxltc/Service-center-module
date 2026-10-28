@@ -3,9 +3,64 @@ const assert = require('node:assert/strict');
 const {
   createActionToken,
   readActionToken,
-  buildReminderEmail
+  buildReminderEmail,
+  registerServiceCallReminderRoutes
 } = require('../service-call-reminders');
 const { parseCall } = require('../service-calls');
+
+test('reminder health endpoint verifies scheduler authorization without sending email', async () => {
+  const routes = new Map();
+  registerServiceCallReminderRoutes({ get: (path, handler) => routes.set(path, handler) }, {});
+  const previousEnvironment = {
+    CRON_SECRET: process.env.CRON_SECRET,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+    APP_URL: process.env.APP_URL,
+    EMAIL_ACTION_SECRET: process.env.EMAIL_ACTION_SECRET
+  };
+  const cronSecret = 'cron-secret-used-only-for-the-health-check';
+  Object.assign(process.env, {
+    CRON_SECRET: cronSecret,
+    RESEND_API_KEY: 'test-resend-key',
+    RESEND_FROM_EMAIL: 'sender@example.com',
+    APP_URL: 'https://api.example.com',
+    EMAIL_ACTION_SECRET: 'email-action-secret-that-is-long-enough'
+  });
+  const invoke = async (authorization) => {
+    const response = {
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(body) {
+        this.body = body;
+        return this;
+      }
+    };
+    await routes.get('/api/service-calls/reminders/health')({
+      get: () => authorization
+    }, response);
+    return response;
+  };
+
+  try {
+    const valid = await invoke(`Bearer ${cronSecret}`);
+    assert.equal(valid.statusCode, 200);
+    assert.equal(valid.body.status, 'ok');
+    assert.equal(valid.body.email_sent, false);
+    assert.equal(Object.values(valid.body).includes(cronSecret), false);
+
+    const invalid = await invoke('Bearer wrong-secret');
+    assert.equal(invalid.statusCode, 401);
+  } finally {
+    Object.entries(previousEnvironment).forEach(([key, value]) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
+});
 
 test('email SOIN action token is signed and bound to a reminder cycle', () => {
   const secret = 'a-secure-test-secret-that-is-at-least-32-characters';

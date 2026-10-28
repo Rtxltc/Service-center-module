@@ -148,6 +148,30 @@ const sendNoStorePage = (res, status, title, body) => res
   .send(htmlPage(title, body));
 
 const registerServiceCallReminderRoutes = (app, db) => {
+  app.get('/api/service-calls/reminders/health', (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) return res.status(503).json({ error: 'CRON_SECRET is not configured.' });
+    const authorization = req.get('Authorization') || '';
+    const expected = Buffer.from(`Bearer ${cronSecret}`);
+    const supplied = Buffer.from(authorization);
+    if (expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      getEmailConfiguration();
+      return res.json({
+        status: 'ok',
+        message: 'Cron request authenticated; reminder email configuration is present.',
+        email_sent: false,
+        checked_at: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Service-call reminder health check failed:', error.message);
+      return res.status(503).json({ error: error.message });
+    }
+  });
+
   app.get('/api/service-calls/reminders', async (req, res) => {
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) return res.status(503).json({ error: 'CRON_SECRET is not configured.' });
