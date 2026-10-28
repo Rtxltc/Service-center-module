@@ -3,6 +3,11 @@ const { deflateRawSync } = require('zlib');
 const COLUMNS = [
   ['SOIN', 'soin'],
   ['IMEI', 'imei'],
+  ['Second IMEI', 'second_imei'],
+  ['Market Name', 'market_name'],
+  ['MTM Number', 'mtm_number'],
+  ['Activation Date', 'activation_date'],
+  ['Warranty Expiry Date', 'warranty_expiry_date'],
   ['Customer Name', 'customer_name'],
   ['Customer Contact', 'customer_contact'],
   ['Device Model', 'model'],
@@ -165,7 +170,7 @@ const buildServiceCallsWorkbook = (calls) => {
   const sheetRows = allRows.map((row, rowIndex) => (
     `<row r="${rowIndex + 1}">${row.map((value, columnIndex) => cellXml(value, rowIndex, columnIndex)).join('')}</row>`
   )).join('');
-  const widths = [22, 18, 24, 20, 24, 42, 20, 14, 22, 12, 16, 16, 22, 16, 22, 22, 18, 22, 22];
+  const widths = [22, 18, 18, 20, 18, 18, 20, 24, 20, 24, 42, 20, 14, 22, 12, 16, 16, 22, 16, 22, 22, 18, 22, 22];
   const cols = widths.map((width, index) => `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`).join('');
   const lastCell = `${columnName(COLUMNS.length - 1)}${allRows.length}`;
 

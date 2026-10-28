@@ -798,6 +798,7 @@ async function mockQuery(text, params = []) {
 const SERVICE_CALL_FIELDS = [
   'soin', 'device_type', 'imei', 'customer_name', 'customer_contact', 'model', 'issue_description',
   'warranty_status', 'call_type', 'part_order_status', 'mail_sent', 'submission_at',
+  'activation_date', 'warranty_expiry_date', 'mtm_number', 'market_name', 'second_imei',
   'relog_due_at', 'quotation_amount', 'submitted_amount', 'payment_method',
   'created_by', 'updated_by'
 ];
@@ -820,7 +821,7 @@ const serviceCallWhere = (filters, values) => {
   if (filters.search) {
     values.push(`%${filters.search.replace(/[\\%_]/g, '\\$&')}%`);
     const parameter = `$${values.length}`;
-    clauses.push(`(soin ILIKE ${parameter} OR imei ILIKE ${parameter} OR customer_name ILIKE ${parameter} OR customer_contact ILIKE ${parameter} OR model ILIKE ${parameter})`);
+    clauses.push(`(soin ILIKE ${parameter} OR imei ILIKE ${parameter} OR second_imei ILIKE ${parameter} OR market_name ILIKE ${parameter} OR mtm_number ILIKE ${parameter} OR customer_name ILIKE ${parameter} OR customer_contact ILIKE ${parameter} OR model ILIKE ${parameter})`);
   }
   return clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 };
@@ -846,6 +847,9 @@ const applySupabaseServiceFilters = (query, filters) => {
       query = query.or([
         `soin.ilike.${pattern}`,
         `imei.ilike.${pattern}`,
+        `second_imei.ilike.${pattern}`,
+        `market_name.ilike.${pattern}`,
+        `mtm_number.ilike.${pattern}`,
         `customer_name.ilike.${pattern}`,
         `customer_contact.ilike.${pattern}`,
         `model.ilike.${pattern}`
@@ -874,7 +878,7 @@ const serviceCalls = {
         const submission = new Date(call.submission_at).getTime();
         const matchesDate = (!filters.dateFrom || submission >= new Date(filters.dateFrom).getTime())
           && (!filters.dateToExclusive || submission < new Date(filters.dateToExclusive).getTime());
-        const matchesSearch = !search || [call.soin, call.imei, call.customer_name, call.customer_contact, call.model]
+        const matchesSearch = !search || [call.soin, call.imei, call.second_imei, call.market_name, call.mtm_number, call.customer_name, call.customer_contact, call.model]
           .some(value => String(value || '').toLowerCase().includes(search));
         const matchesWarranty = !filters.warrantyStatus || call.warranty_status === filters.warrantyStatus;
         const matchesCallType = !filters.callType || call.call_type === filters.callType;
@@ -936,7 +940,7 @@ const serviceCalls = {
         const due = new Date(call.relog_due_at).getTime();
         return (!filters.dateFrom || submission >= new Date(filters.dateFrom).getTime())
           && (!filters.dateToExclusive || submission < new Date(filters.dateToExclusive).getTime())
-          && (!search || [call.soin, call.imei, call.customer_name, call.customer_contact, call.model]
+          && (!search || [call.soin, call.imei, call.second_imei, call.market_name, call.mtm_number, call.customer_name, call.customer_contact, call.model]
             .some(value => String(value || '').toLowerCase().includes(search)))
           && (!filters.warrantyStatus || call.warranty_status === filters.warrantyStatus)
           && (!filters.callType || call.call_type === filters.callType)
@@ -1049,6 +1053,113 @@ const serviceCalls = {
     await pool.query(
       'UPDATE service_calls SET reminder_claimed_at = NULL WHERE id = $1 AND reminder_cycle = $2 AND reminder_stage = $3',
       [id, cycle, stage]
+    );
+  },
+
+  async claimApprovalEmail(id) {
+    if (useSupabase) {
+      const { data, error } = await supabase.rpc('claim_service_call_approval_email', { p_id: id });
+      if (error) throw error;
+      return data === true;
+    }
+    await testConnection();
+    if (!usePG) {
+      const data = readMockData();
+      const call = (data.service_calls || []).find(item => String(item.id) === String(id));
+      if (!call || call.mail_sent || call.approval_email_sending) return false;
+      call.approval_email_sending = true;
+      writeMockData(data);
+      return true;
+    }
+    const result = await pool.query('SELECT claim_service_call_approval_email($1) AS claimed', [id]);
+    return result.rows[0].claimed;
+  },
+
+  async completeApprovalEmail(id, details, administratorId) {
+    const values = [
+      id,
+      details.subject,
+      details.to,
+      details.cc,
+      details.requestText,
+      details.remark,
+      details.videoLink,
+      administratorId
+    ];
+    if (useSupabase) {
+      const { data, error } = await supabase.rpc('complete_service_call_approval_email', {
+        p_id: id,
+        p_subject: details.subject,
+        p_to: details.to,
+        p_cc: details.cc,
+        p_request_text: details.requestText,
+        p_remark: details.remark,
+        p_video_link: details.videoLink,
+        p_administrator_id: administratorId
+      });
+      if (error) throw error;
+      return data;
+    }
+    await testConnection();
+    if (!usePG) {
+      const data = readMockData();
+      const call = (data.service_calls || []).find(item => String(item.id) === String(id));
+      if (!call || !call.approval_email_sending) return null;
+      Object.assign(call, {
+        mail_sent: true,
+        approval_email_sending: false,
+        approval_email_sent_at: new Date().toISOString(),
+        approval_email_subject: details.subject,
+        approval_email_to: details.to,
+        approval_email_cc: details.cc,
+        approval_request_text: details.requestText,
+        approval_remark: details.remark,
+        approval_video_link: details.videoLink,
+        updated_at: new Date().toISOString(),
+        updated_by: administratorId
+      });
+      writeMockData(data);
+      return call;
+    }
+    const result = await pool.query(
+      `UPDATE service_calls
+          SET mail_sent = TRUE,
+              approval_email_sending = FALSE,
+              approval_email_sent_at = CURRENT_TIMESTAMP,
+              approval_email_subject = $2,
+              approval_email_to = $3,
+              approval_email_cc = $4,
+              approval_request_text = $5,
+              approval_remark = $6,
+              approval_video_link = $7,
+              updated_at = CURRENT_TIMESTAMP,
+              updated_by = $8
+        WHERE id = $1 AND approval_email_sending = TRUE
+        RETURNING *`,
+      values
+    );
+    return result.rows[0] || null;
+  },
+
+  async releaseApprovalEmailClaim(id) {
+    if (useSupabase) {
+      const { error } = await supabase.rpc('release_service_call_approval_email', { p_id: id });
+      if (error) throw error;
+      return;
+    }
+    await testConnection();
+    if (!usePG) {
+      const data = readMockData();
+      const call = (data.service_calls || []).find(item => String(item.id) === String(id));
+      if (call && call.approval_email_sending && !call.mail_sent) {
+        call.approval_email_sending = false;
+        writeMockData(data);
+      }
+      return;
+    }
+    await pool.query(
+      'UPDATE service_calls SET approval_email_sending = FALSE WHERE id = $1 AND approval_email_sending = TRUE AND mail_sent = FALSE',
+      [id]
     );
   },
 
@@ -1290,6 +1401,74 @@ const serviceCalls = {
   }
 };
 
+const gmailOAuth = {
+  async getCredentials() {
+    if (useSupabase) {
+      const { data, error } = await supabase.from('gmail_oauth_credentials')
+        .select('email, encrypted_refresh_token, connected_at').eq('id', true).maybeSingle();
+      if (error) throw error;
+      return data;
+    }
+    await testConnection();
+    if (!usePG) return readMockData().gmail_oauth_credentials || null;
+    const result = await pool.query(
+      'SELECT email, encrypted_refresh_token, connected_at FROM gmail_oauth_credentials WHERE id = TRUE'
+    );
+    return result.rows[0] || null;
+  },
+
+  async saveCredentials(email, encryptedRefreshToken) {
+    if (useSupabase) {
+      const { error } = await supabase.from('gmail_oauth_credentials').upsert({
+        id: true,
+        email,
+        encrypted_refresh_token: encryptedRefreshToken,
+        connected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+      if (error) throw error;
+      return;
+    }
+    await testConnection();
+    if (!usePG) {
+      const data = readMockData();
+      data.gmail_oauth_credentials = {
+        email,
+        encrypted_refresh_token: encryptedRefreshToken,
+        connected_at: new Date().toISOString()
+      };
+      writeMockData(data);
+      return;
+    }
+    await pool.query(
+      `INSERT INTO gmail_oauth_credentials (id, email, encrypted_refresh_token, connected_at, updated_at)
+       VALUES (TRUE, $1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       ON CONFLICT (id) DO UPDATE
+       SET email = EXCLUDED.email,
+           encrypted_refresh_token = EXCLUDED.encrypted_refresh_token,
+           connected_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP`,
+      [email, encryptedRefreshToken]
+    );
+  },
+
+  async deleteCredentials() {
+    if (useSupabase) {
+      const { error } = await supabase.from('gmail_oauth_credentials').delete().eq('id', true);
+      if (error) throw error;
+      return;
+    }
+    await testConnection();
+    if (!usePG) {
+      const data = readMockData();
+      delete data.gmail_oauth_credentials;
+      writeMockData(data);
+      return;
+    }
+    await pool.query('DELETE FROM gmail_oauth_credentials WHERE id = TRUE');
+  }
+};
+
 module.exports = {
   query: async (text, params) => {
     if (useSupabase) {
@@ -1304,6 +1483,7 @@ module.exports = {
     }
   },
   serviceCalls,
+  gmailOAuth,
   isSupabase: useSupabase,
   pool
 };

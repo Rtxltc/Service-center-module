@@ -25,10 +25,61 @@ const EMPTY_FORM = {
   part_order_status: 'Not Yet Ordered',
   mail_sent: false,
   submission_at: '',
+  activation_date: '',
+  warranty_expiry_date: '',
+  mtm_number: '',
+  market_name: '',
+  second_imei: '',
   quotation_amount: '',
   submitted_amount: '',
   payment_method: ''
 };
+
+const compressImage = async (file) => {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    throw new Error(`${file.name} is not a JPEG, PNG, or WebP image.`);
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    throw new Error(`${file.name} is larger than the 20 MB source-image limit.`);
+  }
+  const bitmap = await createImageBitmap(file);
+  let scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  try {
+    for (let resizeAttempt = 0; resizeAttempt < 5; resizeAttempt += 1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error(`Could not prepare ${file.name} for compression.`);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      for (const quality of [0.84, 0.76, 0.68, 0.6, 0.52]) {
+        const blob = await new Promise((resolve, reject) => {
+          canvas.toBlob(result => result ? resolve(result) : reject(new Error(`Could not compress ${file.name}.`)), 'image/jpeg', quality);
+        });
+        if (blob.size <= 450 * 1024) {
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          let binary = '';
+          for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+            binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+          }
+          const name = file.name.replace(/\.[^.]+$/, '') || 'service-call-image';
+          return {
+            name: `${name}.jpg`,
+            mime_type: 'image/jpeg',
+            data: window.btoa(binary),
+            size: blob.size
+          };
+        }
+      }
+      scale *= 0.75;
+    }
+  } finally {
+    bitmap.close();
+  }
+  throw new Error(`${file.name} could not be compressed below 450 KB.`);
+};
+
+const parseEmailList = (value) => value.split(/[,;\n]/).map(email => email.trim()).filter(Boolean);
 
 const inputDateTime = (value) => {
   const date = value ? new Date(value) : new Date();
@@ -62,6 +113,12 @@ const formatIndiaDateTime = (value) => value
   }).format(new Date(value))
   : '—';
 
+const formatApprovalDate = (value) => {
+  if (!value) return '—';
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return year && month && day ? `${day}/${month}/${year}` : '—';
+};
+
 const formatDuration = (milliseconds) => {
   const totalMinutes = Math.max(0, Math.floor(milliseconds / 60000));
   const days = Math.floor(totalMinutes / 1440);
@@ -89,6 +146,10 @@ function ServiceCalls({ apiBase, password }) {
   const [tatNow, setTatNow] = useState(() => performance.now());
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const [approvalComposer, setApprovalComposer] = useState(null);
+  const [gmailStatus, setGmailStatus] = useState(null);
+  const [gmailStatusError, setGmailStatusError] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
@@ -111,6 +172,36 @@ function ServiceCalls({ apiBase, password }) {
   const showError = (reason) => {
     setError(reason.message || 'Service call request failed.');
     setNotice('');
+  };
+
+  const loadGmailStatus = async () => {
+    try {
+      const response = await request('/admin/gmail/status');
+      setGmailStatus(await response.json());
+      setGmailStatusError('');
+    } catch (reason) {
+      setGmailStatusError(reason.message || 'Could not load Gmail connection status.');
+    }
+  };
+
+  useEffect(() => {
+    const refreshStatus = () => loadGmailStatus();
+    refreshStatus();
+    window.addEventListener('focus', refreshStatus);
+    return () => window.removeEventListener('focus', refreshStatus);
+  }, [apiBase, password]);
+
+  const connectGmail = async () => {
+    setApprovalBusy(true);
+    setError('');
+    try {
+      const response = await request('/admin/gmail/connect', { method: 'POST' });
+      const result = await response.json();
+      window.location.assign(result.authorization_url);
+    } catch (reason) {
+      showError(reason);
+      setApprovalBusy(false);
+    }
   };
 
   const loadDashboard = async () => {
@@ -202,6 +293,113 @@ function ServiceCalls({ apiBase, password }) {
       showError(reason);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openApprovalComposer = async (call, returnView) => {
+    setApprovalBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await request(`/service-calls/${call.id}/approval-email`);
+      const result = await response.json();
+      if (!result.connected) {
+        setError('Connect the Gmail sender account before preparing an approval email.');
+        return;
+      }
+      setApprovalComposer({
+        ...result,
+        returnView,
+        toText: result.to.join('\n'),
+        ccText: result.cc.join('\n'),
+        images: []
+      });
+      setView('approval');
+    } catch (reason) {
+      showError(reason);
+    } finally {
+      setApprovalBusy(false);
+    }
+  };
+
+  const resolveApprovalSend = async (call, returnView) => {
+    if (!window.confirm('Check the sender Gmail Sent folder first. Continue only if this email was not sent; this will allow another send attempt.')) return;
+    setApprovalBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await request(`/service-calls/${call.id}/approval-email/retry`, {
+        method: 'POST',
+        body: JSON.stringify({ confirmed_not_sent: true })
+      });
+      const result = await response.json();
+      setNotice(result.message);
+      if (returnView === 'details') await openDetails(call);
+      else await loadCalls();
+    } catch (reason) {
+      showError(reason);
+    } finally {
+      setApprovalBusy(false);
+    }
+  };
+
+  const addApprovalImages = async (event) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!selectedFiles.length) return;
+    if (approvalComposer.images.length + selectedFiles.length > 6) {
+      setError('Attach no more than six images.');
+      return;
+    }
+    setApprovalBusy(true);
+    setError('');
+    try {
+      const images = await Promise.all(selectedFiles.map(compressImage));
+      const combinedSize = [...approvalComposer.images, ...images].reduce((sum, image) => sum + image.size, 0);
+      if (combinedSize > 2500 * 1024) throw new Error('Combined image size must be no more than 2,500 KB.');
+      setApprovalComposer(current => ({ ...current, images: [...current.images, ...images] }));
+    } catch (reason) {
+      showError(reason);
+    } finally {
+      setApprovalBusy(false);
+    }
+  };
+
+  const sendApprovalEmail = async (event) => {
+    event.preventDefault();
+    if (!approvalComposer) return;
+    const to = parseEmailList(approvalComposer.toText);
+    const cc = parseEmailList(approvalComposer.ccText);
+    if (!window.confirm(`Send this parts-approval email to ${to.join(', ')}? This will mark the approval email as sent.`)) return;
+    setApprovalBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await request(`/service-calls/${approvalComposer.call.id}/approval-email/send`, {
+        method: 'POST',
+        body: JSON.stringify({
+          to,
+          cc,
+          request_text: approvalComposer.request_text,
+          remark: approvalComposer.remark,
+          video_link: approvalComposer.video_link,
+          images: approvalComposer.images.map(({ name, mime_type, data }) => ({ name, mime_type, data }))
+        })
+      });
+      const result = await response.json();
+      setApprovalComposer(null);
+      setNotice(result.message || 'Parts-approval email sent.');
+      await openDetails(result.call);
+    } catch (reason) {
+      if (/Gmail did not confirm|Gmail accepted the message/.test(reason.message)) {
+        const returnView = approvalComposer.returnView;
+        setApprovalComposer(null);
+        setView(returnView);
+        if (returnView === 'details') await openDetails(approvalComposer.call);
+      }
+      showError(reason);
+    } finally {
+      setApprovalBusy(false);
     }
   };
 
@@ -339,7 +537,7 @@ function ServiceCalls({ apiBase, password }) {
 
   const renderFilters = () => (
     <div className="service-call-filters">
-      <label className="service-call-filter service-call-search">Search<input className="form-input" value={filters.search} placeholder="SOIN, IMEI, customer, contact, model" onChange={(event) => updateFilter('search', event.target.value)} /></label>
+      <label className="service-call-filter service-call-search">Search<input className="form-input" value={filters.search} placeholder="SOIN, IMEI/MTM, market, customer, contact, model" onChange={(event) => updateFilter('search', event.target.value)} /></label>
       {renderDateFilters()}
       <label className="service-call-filter">Warranty<select className="form-input" value={filters.warranty_status} onChange={(event) => updateFilter('warranty_status', event.target.value)}><option value="">All</option><option>In Warranty</option><option>Out of Warranty</option></select></label>
       <label className="service-call-filter">TAT status<select className="form-input" value={filters.tat_status} onChange={(event) => updateFilter('tat_status', event.target.value)}><option value="">All</option><option>IN TAT</option><option>TAT Missed</option></select></label>
@@ -360,10 +558,14 @@ function ServiceCalls({ apiBase, password }) {
         <div className="service-calls-heading-actions">
           <button className="btn btn-secondary" onClick={() => setView('dashboard')}>Dashboard</button>
           <button className="btn btn-secondary" onClick={() => { setPage(1); setView('list'); }}>All Calls</button>
+          <button className="btn btn-secondary" onClick={connectGmail} disabled={approvalBusy}>
+            {approvalBusy ? 'Connecting…' : gmailStatus?.connected ? `Gmail: ${gmailStatus.email}` : 'Connect Gmail'}
+          </button>
           <button className="btn btn-primary" onClick={openNewForm}>+ Add Service Call</button>
         </div>
       </div>
 
+      {gmailStatusError && <p className="service-call-approval-status" role="status">Gmail status unavailable: {gmailStatusError}</p>}
       {notice && <div className="service-call-notice" role="status">{notice}</div>}
       {error && <div className="service-call-error" role="alert">{error}</div>}
       {loading && <p className="service-call-loading" role="status">Loading service calls…</p>}
@@ -446,6 +648,9 @@ function ServiceCalls({ apiBase, password }) {
                       <button className="service-call-link" onClick={() => openDetails(call)}>Details</button>
                       <button className="service-call-link" onClick={() => openEditForm(call)}>Edit</button>
                       <button className="service-call-link" onClick={() => { setSelectedCall(call); setSoinForm({ soin: call.soin, reason: '' }); setSoinModalOpen(true); }}>Update SOIN</button>
+                      {!call.mail_sent && (call.approval_email_sending
+                        ? <button className="service-call-link" onClick={() => resolveApprovalSend(call, 'list')} disabled={approvalBusy}>Resolve send</button>
+                        : <button className="service-call-link" onClick={() => openApprovalComposer(call, 'list')} disabled={approvalBusy}>Send mail</button>)}
                     </td>
                   </tr>
                 ))}</tbody>
@@ -474,6 +679,11 @@ function ServiceCalls({ apiBase, password }) {
             <label>Call type<select className="form-input" value={form.call_type} onChange={event => setForm({ ...form, call_type: event.target.value })}><option>Hardware</option><option>Software</option></select></label>
             <label>Part order status<select className="form-input" value={form.part_order_status} onChange={event => setForm({ ...form, part_order_status: event.target.value })}><option>Not Yet Ordered</option><option>Ordered</option></select></label>
             <label>Submission date and time<input className="form-input" type="datetime-local" value={form.submission_at} onChange={event => setForm({ ...form, submission_at: event.target.value })} required /></label>
+            <label>Market name<input className="form-input" value={form.market_name || ''} onChange={event => setForm({ ...form, market_name: event.target.value })} maxLength="150" /></label>
+            <label>MTM number<input className="form-input" value={form.mtm_number || ''} onChange={event => setForm({ ...form, mtm_number: event.target.value })} maxLength="100" /></label>
+            <label>Activation date<input className="form-input" type="date" value={form.activation_date || ''} onChange={event => setForm({ ...form, activation_date: event.target.value })} /></label>
+            <label>Warranty expiry date<input className="form-input" type="date" value={form.warranty_expiry_date || ''} onChange={event => setForm({ ...form, warranty_expiry_date: event.target.value })} /></label>
+            <label>Second IMEI (optional)<input className="form-input" inputMode="numeric" pattern="[0-9]{15}" maxLength="15" value={form.second_imei || ''} onChange={event => setForm({ ...form, second_imei: event.target.value })} /></label>
             <label>Parts approval email status<select className="form-input" value={String(form.mail_sent)} onChange={event => setForm({ ...form, mail_sent: event.target.value === 'true' })}><option value="false">Not sent</option><option value="true">Sent</option></select></label>
           </div>
           <label>Issue description<textarea className="form-input" rows="4" value={form.issue_description} onChange={event => setForm({ ...form, issue_description: event.target.value })} maxLength="10000" required /></label>
@@ -494,6 +704,8 @@ function ServiceCalls({ apiBase, password }) {
           <dl className="service-call-detail-grid">
             {[
               ['Device type', selectedCall.device_type], ['IMEI', selectedCall.imei || '—'], ['Customer contact', selectedCall.customer_contact], ['Issue', selectedCall.issue_description],
+              ['Second IMEI', selectedCall.second_imei || '—'], ['Market name', selectedCall.market_name || '—'], ['MTM number', selectedCall.mtm_number || '—'],
+              ['Activation date', selectedCall.activation_date || '—'], ['Warranty expiry date', selectedCall.warranty_expiry_date || '—'],
               ['Warranty', selectedCall.warranty_status], ['Call type', selectedCall.call_type], ['Parts', selectedCall.part_order_status],
               ['Parts approval email', selectedCall.mail_sent ? 'Sent' : 'Not sent'], ['Submission', formatIndiaDateTime(selectedCall.submission_at)],
               ['TAT deadline', formatIndiaDateTime(selectedCall.relog_due_at)],
@@ -506,6 +718,9 @@ function ServiceCalls({ apiBase, password }) {
             <button className="btn btn-secondary" onClick={() => setView('list')}>Back to calls</button>
             <button className="btn btn-secondary" onClick={() => openEditForm(selectedCall)}>Edit</button>
             <button className="btn btn-primary" onClick={() => { setSoinForm({ soin: selectedCall.soin, reason: '' }); setSoinModalOpen(true); }}>Update SOIN</button>
+            {!selectedCall.mail_sent && (selectedCall.approval_email_sending
+              ? <button className="btn btn-secondary" onClick={() => resolveApprovalSend(selectedCall, 'details')} disabled={approvalBusy}>Resolve send status</button>
+              : <button className="btn btn-primary" onClick={() => openApprovalComposer(selectedCall, 'details')} disabled={approvalBusy}>Send mail</button>)}
           </div>
           <div className="service-call-history">
             <h4>SOIN change history</h4>
@@ -514,6 +729,63 @@ function ServiceCalls({ apiBase, password }) {
             ))}
           </div>
         </div>
+      )}
+
+      {view === 'approval' && approvalComposer && (
+        <form className="service-call-form service-call-approval" onSubmit={sendApprovalEmail}>
+          <h4>Review parts-approval email</h4>
+          <p>From: <strong>{approvalComposer.sender}</strong></p>
+          <label>To (separate addresses with commas or new lines)<textarea className="form-input" rows="3" value={approvalComposer.toText} onChange={event => setApprovalComposer({ ...approvalComposer, toText: event.target.value })} required /></label>
+          <label>CC (separate addresses with commas or new lines)<textarea className="form-input" rows="3" value={approvalComposer.ccText} onChange={event => setApprovalComposer({ ...approvalComposer, ccText: event.target.value })} /></label>
+          <label>Subject<input className="form-input" value={approvalComposer.subject} readOnly /></label>
+          <label>Approval request<textarea className="form-input" rows="3" maxLength="2000" value={approvalComposer.request_text} onChange={event => setApprovalComposer({ ...approvalComposer, request_text: event.target.value })} required /></label>
+          <label>Technician remark<textarea className="form-input" rows="4" maxLength="5000" value={approvalComposer.remark} onChange={event => setApprovalComposer({ ...approvalComposer, remark: event.target.value })} required /></label>
+          <label>Video link (optional)<input className="form-input" type="url" value={approvalComposer.video_link} onChange={event => setApprovalComposer({ ...approvalComposer, video_link: event.target.value })} placeholder="https://" /></label>
+          <div className="service-call-approval-preview">
+            <h5>Email body preview</h5>
+            <p>Dear Sir,<br />Request for approval: {approvalComposer.request_text}</p>
+            <div className="table-responsive">
+              <table className="admin-table">
+                <thead><tr><th>SO NO</th><th>IMEI 1</th><th>IMEI 2</th><th>Model No</th><th>Activation Date</th><th>Warranty End Date</th></tr></thead>
+                <tbody><tr>
+                  <td>{approvalComposer.call.soin}</td><td>{approvalComposer.call.imei || '—'}</td><td>{approvalComposer.call.second_imei || '—'}</td>
+                  <td>{approvalComposer.call.model}</td><td>{formatApprovalDate(approvalComposer.call.activation_date)}</td><td>{formatApprovalDate(approvalComposer.call.warranty_expiry_date)}</td>
+                </tr></tbody>
+              </table>
+            </div>
+            <p>Fault Description: {approvalComposer.call.issue_description}</p>
+            <p>Remark: {approvalComposer.remark}</p>
+            {approvalComposer.video_link && <p>Video Link: {approvalComposer.video_link}</p>}
+            <div className="table-responsive">
+              <table className="admin-table">
+                <thead><tr><th>SL NO</th><th>MODEL</th><th>IMEI 1</th><th>IMEI 2</th><th>MTM</th><th>Activation Date</th></tr></thead>
+                <tbody><tr>
+                  <td>1</td><td>{approvalComposer.call.model}</td><td>{approvalComposer.call.imei || '—'}</td><td>{approvalComposer.call.second_imei || '—'}</td>
+                  <td>{approvalComposer.call.mtm_number}</td><td>{formatApprovalDate(approvalComposer.call.activation_date)}</td>
+                </tr></tbody>
+              </table>
+            </div>
+          </div>
+          <label>Photos (1–6 images, compressed before sending)<input className="form-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={addApprovalImages} disabled={approvalBusy || approvalComposer.images.length >= 6} /></label>
+          {approvalComposer.images.length > 0 && (
+            <ul className="service-call-approval-images">
+              {approvalComposer.images.map((image, index) => (
+                <li key={`${image.name}-${index}`}>
+                  <span>{image.name} · {(image.size / 1024).toFixed(0)} KB</span>
+                  <button className="service-call-link" type="button" onClick={() => setApprovalComposer(current => ({
+                    ...current,
+                    images: current.images.filter((_, imageIndex) => imageIndex !== index)
+                  }))}>Remove</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="service-call-approval-subject">The email will be sent exactly as previewed above with the listed images attached.</p>
+          <div className="service-call-form-actions">
+            <button className="btn btn-primary" type="submit" disabled={approvalBusy || approvalComposer.images.length === 0}>{approvalBusy ? 'Preparing…' : 'Confirm and send email'}</button>
+            <button className="btn btn-secondary" type="button" disabled={approvalBusy} onClick={() => { setView(approvalComposer.returnView); setApprovalComposer(null); }}>Cancel</button>
+          </div>
+        </form>
       )}
 
       {soinModalOpen && selectedCall && (

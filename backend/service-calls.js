@@ -104,6 +104,27 @@ const parseCall = (input, existing = null, administratorId = null) => {
   if (merged.device_type === 'Mobile' && !/^\d{15}$/.test(String(merged.imei || '').trim())) {
     throw Object.assign(new Error('IMEI is required for mobile devices and must contain exactly 15 digits'), { status: 400 });
   }
+  const secondImei = merged.second_imei == null || String(merged.second_imei).trim() === ''
+    ? null
+    : String(merged.second_imei).trim();
+  if (secondImei && !/^\d{15}$/.test(secondImei)) {
+    throw Object.assign(new Error('Second IMEI must contain exactly 15 digits'), { status: 400 });
+  }
+  const optionalText = (field, maximum) => {
+    const value = merged[field] == null ? '' : String(merged[field]).trim();
+    if (value.length > maximum || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)) {
+      throw Object.assign(new Error(`${field} must be ${maximum} characters or fewer`), { status: 400 });
+    }
+    return value || null;
+  };
+  const parseOptionalDate = (field) => {
+    const value = merged[field] == null ? '' : String(merged[field]).trim();
+    if (!value) return null;
+    if (!isDateOnly(value)) {
+      throw Object.assign(new Error(`${field} must be a valid YYYY-MM-DD date`), { status: 400 });
+    }
+    return value;
+  };
   if (!WARRANTY_STATUSES.includes(merged.warranty_status)) {
     throw Object.assign(new Error('warranty_status must be In Warranty or Out of Warranty'), { status: 400 });
   }
@@ -159,6 +180,11 @@ const parseCall = (input, existing = null, administratorId = null) => {
     call_type: merged.call_type,
     part_order_status: merged.part_order_status,
     mail_sent: input.mail_sent === undefined ? Boolean(existing && existing.mail_sent) : input.mail_sent,
+    activation_date: parseOptionalDate('activation_date'),
+    warranty_expiry_date: parseOptionalDate('warranty_expiry_date'),
+    mtm_number: optionalText('mtm_number', 100),
+    market_name: optionalText('market_name', 150),
+    second_imei: secondImei,
     submission_at: submissionAt.toISOString(),
     relog_due_at: new Date(submissionAt.getTime() + 47 * 60 * 60 * 1000).toISOString(),
     quotation_amount: quotationAmount,

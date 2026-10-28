@@ -1206,6 +1206,45 @@ textarea.form-input {
   box-shadow: var(--shadow-sm);
 }
 
+.service-call-approval-status,
+.service-call-approval-subject {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.service-call-approval-preview {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.service-call-approval-preview h5,
+.service-call-approval-preview p {
+  margin: 0;
+}
+
+.service-call-approval-images {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.service-call-approval-images li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  overflow-wrap: anywhere;
+}
+
 .service-call-alerts h4 {
   display: flex;
   flex-wrap: wrap;

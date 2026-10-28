@@ -4,10 +4,10 @@
 
 The admin portal includes a Service Calls module backed by the existing Express API and PostgreSQL/Supabase database. Before starting the updated backend, apply these migrations in order to the existing database:
 
-- PostgreSQL: apply `001_service_calls.sql`, then `002_service_call_email_reminders.sql`, `003_single_service_call_reminder.sql`, and `004_separate_approval_mail_status.sql` in order.
-- Supabase: run all four SQL files, in order, in the project's SQL Editor.
+- PostgreSQL: apply migrations 001–004, then 005 and 006 in order.
+- Supabase: run migrations 001–004 in the project's SQL Editor. Configure the reminder prerequisites and run migration 005 as described below, then run migration 006.
 
-The first migration creates the service-call and SOIN audit tables, indexes, the 47-hour deadline trigger, and the atomic SOIN update function. The second adds reminder scheduling and secure email SOIN updates. The third limits the automation to one email per SOIN cycle. The fourth separates the manual parts-approval email status from automatic TAT reminder tracking, preserving the approval status when SOIN or submission time changes. Existing service calls are not automatically emailed when reminders are first enabled. These migrations do not modify repair, income, expense, or contact records. Do not apply them to a different database than the one configured for the backend.
+The first migration creates the service-call and SOIN audit tables, indexes, the 47-hour deadline trigger, and the atomic SOIN update function. The second adds reminder scheduling and secure email SOIN updates. The third limits the automation to one email per SOIN cycle. The fourth separates the manual parts-approval email status from automatic TAT reminder tracking. The fifth schedules the reminder endpoint through Supabase Cron after its prerequisites are configured. The sixth adds approval-email metadata, Gmail OAuth credential storage, and atomic approval-send state. Existing service calls are not automatically emailed when reminders are first enabled. These migrations do not modify repair, income, expense, or contact records. Do not apply them to a different database than the one configured for the backend.
 
 For Supabase deployments, configure `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_KEY`) as the server-only service-role key. Row-level security is enabled on the new service-call tables without public policies, so the publishable/anon key cannot read or modify service calls directly. Never put the service-role key in the frontend.
 
@@ -32,8 +32,32 @@ The backend sends email through Resend to `charom.ram.ayodhya@gmail.com` using t
 - `EMAIL_ACTION_SECRET`: at least 32 characters of random secret data; keep it private.
 - `CRON_SECRET`: at least 32 characters of random secret data used to authorize the scheduled reminder endpoint.
 
-Vercel Hobby does not support a one-minute Cron schedule, so the backend does not use Vercel Cron for reminders. Configure an external scheduler (for example, cron-job.org) to make a `GET` request every minute to `https://<your-backend-host>/api/service-calls/reminders`, with the HTTP header `Authorization: Bearer <CRON_SECRET>`. Set `CRON_SECRET` in both the backend deployment environment and the scheduler, using the same value. Keep the secret in the scheduler's header configuration, not in the request URL. To test connectivity and authorization without sending an email, use `GET https://<your-backend-host>/api/service-calls/reminders/health` with the same header. A successful response includes `"status":"ok"` and `"email_sent":false`; this confirms the request reached the backend and its reminder environment settings are present. The separate daily database-backup cron remains on Vercel.
+Reminder checks run every minute using Supabase's built-in `pg_cron` scheduler, so no cron-job.org account or Vercel minute-level Cron is required. In the Supabase project, enable the `pg_cron`, `pg_net`, and Vault extensions. In Vault, add these two secrets:
 
-The single automatic TAT reminder is sent after the entered phone-submission date/time plus 47 hours. The scheduler checks once per minute, so actual delivery can be slightly later than the exact deadline. No additional TAT reminder is sent until SOIN is updated. The email button opens a secure form to enter the new SOIN. A successful SOIN change is added to the audit history and starts a fresh 47-hour timer. The phone-submission timestamp and manual parts-approval email status remain unchanged.
+- `service_call_reminder_backend_url`: `https://api.charom-resq.com/api/service-calls/reminders`
+- `service_call_reminder_cron_secret`: the same raw secret configured as `CRON_SECRET` in the backend's Vercel Production environment.
 
-The `mail_sent` field is the manually maintained status of the separate parts-approval email to the technician; it does not send an email. The automatic TAT reminder has separate scheduling state and does not change this approval-mail status. Gmail API integration for sending approval emails can be added later without conflating the two email workflows.
+Then run `backend/migrations/005_schedule_service_call_reminders.sql` in Supabase SQL Editor. It checks the extensions and Vault entries before creating/updating the named one-minute Cron job. Keep the secret values private; do not put them in the frontend or directly in the SQL job definition. To test the backend endpoint manually without sending an email, use `GET https://api.charom-resq.com/api/service-calls/reminders/health` with `Authorization: Bearer <CRON_SECRET>`. A successful response includes `"status":"ok"` and `"email_sent":false`. The separate daily database-backup cron remains on Vercel.
+
+The single automatic TAT reminder is sent after the entered phone-submission date/time plus 47 hours. Supabase Cron checks once per minute, so actual delivery can be slightly later than the exact deadline. No additional TAT reminder is sent until SOIN is updated. The email button opens a secure form to enter the new SOIN. A successful SOIN change is added to the audit history and starts a fresh 47-hour timer. The phone-submission timestamp and manual parts-approval email status remain unchanged.
+
+### Parts-approval emails through Gmail
+
+The parts-approval email is a separate, manually reviewed email workflow; it does not replace or change the automatic TAT reminder. Apply migration `006_parts_approval_gmail.sql` before using it. In Google Auth Platform, configure an OAuth consent screen with the Gmail send scope (`https://www.googleapis.com/auth/gmail.send`) and `userinfo.email`, add the sender as a test user while the app is in Testing, and create a Web application OAuth client. Add this exact authorized redirect URI:
+
+`https://api.charom-resq.com/api/admin/gmail/oauth/callback`
+
+Set these variables in the backend deployment only:
+
+- `GMAIL_OAUTH_CLIENT_ID`: OAuth client ID.
+- `GMAIL_OAUTH_CLIENT_SECRET`: OAuth client secret.
+- `GMAIL_OAUTH_REDIRECT_URI`: the exact callback URI configured above.
+- `GMAIL_OAUTH_STATE_SECRET`: at least 32 characters of random secret data.
+- `GMAIL_TOKEN_ENCRYPTION_KEY`: exactly 64 hexadecimal characters (32 random bytes), used to encrypt the stored refresh token.
+- `GMAIL_SENDER_EMAIL`: expected Google sender account; defaults to `ordernu13@gmail.com`.
+- `GMAIL_APPROVAL_DEFAULT_TO` (optional): comma-separated default To recipients; defaults to `ordernu2@gmail.com,ordernu4@gmail.com`.
+- `GMAIL_APPROVAL_DEFAULT_CC` (optional): comma-separated default Cc recipients; defaults to `ordernu5@gmail.com,ordernu11@gmail.com,ordernu13@gmail.com`.
+
+The authorized Google account must match `GMAIL_SENDER_EMAIL`. Connect it using the **Connect Gmail** control in the admin Service Calls page. The refresh token is encrypted before it is stored in the RLS-protected `gmail_oauth_credentials` table; never expose OAuth credentials or encryption keys in the frontend. The consent-screen test mode may expire refresh tokens after seven days; for a continuously connected production sender, complete Google's consent-screen publishing and any verification Google requires.
+
+Each call can store its market name, MTM number, activation date, warranty expiry date, and optional second IMEI. Selecting **Send mail** opens a review form for editable recipients, approval request, technician remark, optional video URL, and 1–6 image attachments. Images are compressed in the browser; the total is limited to 2,500 KB. The generated subject follows `RRL-103/Charom Enterprises, Ayodhya/{SOIN}/{Market name}/{Issue mentioned in call}`. Sending requires a final confirmation; `mail_sent` is set only after Gmail accepts the message. A send claim prevents simultaneous duplicate sends. If the send result is uncertain, check Gmail Sent before using **Resolve send**; if Gmail accepted the email but saving its status failed, check the call record before retrying.

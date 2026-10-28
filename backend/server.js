@@ -15,7 +15,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-password'],
   exposedHeaders: ['Content-Disposition']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '4mb' }));
 app.use(express.urlencoded({ extended: false }));
 
 // Helper function to generate unique Ticket ID
@@ -43,6 +43,7 @@ const checkAdminAuth = (req, res, next) => {
 
 require('./service-calls')(app, db, checkAdminAuth);
 require('./service-call-reminders').registerServiceCallReminderRoutes(app, db);
+require('./gmail-approval').registerGmailApprovalRoutes(app, db, checkAdminAuth);
 
 // 1. Health check
 app.get('/api/health', (req, res) => {

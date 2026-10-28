@@ -27,6 +27,11 @@ test('service-call export is a formatted XLSX workbook with safe text cells', ()
     soin: '=HYPERLINK("https://example.invalid","open")',
     device_type: 'Mobile',
     imei: '123456789012345',
+    second_imei: '543210987654321',
+    market_name: 'Ayodhya',
+    mtm_number: 'MTM-456',
+    activation_date: '2026-10-25',
+    warranty_expiry_date: '2027-10-24',
     customer_name: 'A & B',
     customer_contact: '+919876543210',
     model: 'Moto Edge',
@@ -48,7 +53,9 @@ test('service-call export is a formatted XLSX workbook with safe text cells', ()
   assert.equal(workbook.subarray(0, 2).toString('ascii'), 'PK');
   const sheet = readZipEntry(workbook, 'xl/worksheets/sheet1.xml');
   const styles = readZipEntry(workbook, 'xl/styles.xml');
-  assert.ok(sheet.includes('<autoFilter ref="A1:S2"/>'));
+  assert.ok(sheet.includes('<autoFilter ref="A1:X2"/>'));
+  assert.ok(sheet.includes('543210987654321'));
+  assert.ok(sheet.includes('MTM-456'));
   assert.ok(sheet.includes('state="frozen"'));
   assert.ok(sheet.includes('t="inlineStr"'));
   assert.ok(sheet.includes('A &amp; B'));
