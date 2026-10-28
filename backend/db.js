@@ -995,7 +995,6 @@ const serviceCalls = {
   async completeReminder(id, cycle, stage) {
     const update = {
       reminder_stage: 1,
-      mail_sent: true,
       reminder_claimed_at: null
     };
     if (useSupabase) {
@@ -1019,9 +1018,8 @@ const serviceCalls = {
     const values = [id, cycle, stage];
     const result = await pool.query(
       `UPDATE service_calls
-          SET reminder_stage = 1,
-              mail_sent = TRUE,
-              reminder_claimed_at = NULL
+        SET reminder_stage = 1,
+            reminder_claimed_at = NULL
         WHERE id = $1 AND reminder_cycle = $2 AND reminder_stage = $3
           AND reminder_claimed_at IS NOT NULL
         RETURNING id`,
@@ -1121,7 +1119,6 @@ const serviceCalls = {
         call.reminder_cycle = Number(call.reminder_cycle || 0) + 1;
         call.first_reminder_sent_at = null;
         call.reminder_claimed_at = null;
-        call.mail_sent = false;
       }
       writeMockData(data);
       return call;
@@ -1176,7 +1173,6 @@ const serviceCalls = {
       call.reminder_cycle = Number(call.reminder_cycle || 0) + 1;
       call.first_reminder_sent_at = null;
       call.reminder_claimed_at = null;
-      call.mail_sent = false;
       call.updated_by = administratorId;
       call.updated_at = history.changed_at;
       data.service_call_soin_history.push(history);
@@ -1200,7 +1196,6 @@ const serviceCalls = {
                 reminder_cycle = reminder_cycle + 1,
                 first_reminder_sent_at = NULL,
                 reminder_claimed_at = NULL,
-                mail_sent = FALSE,
                 updated_by = $2,
                 updated_at = CURRENT_TIMESTAMP
           WHERE id = $3
@@ -1262,7 +1257,6 @@ const serviceCalls = {
         reminder_cycle: Number(call.reminder_cycle || 0) + 1,
         first_reminder_sent_at: null,
         reminder_claimed_at: null,
-        mail_sent: false,
         updated_by: 'email',
         updated_at: changedAt
       });

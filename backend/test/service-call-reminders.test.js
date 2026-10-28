@@ -92,7 +92,7 @@ test('reminder email sends one 47-hour reminder with an escaped SOIN update link
   assert.doesNotMatch(email.text, /One hour has passed/);
 });
 
-test('phone submission timestamp is the source of the exact 47-hour deadline', () => {
+test('47-hour deadline and manual parts-approval email status remain independent', () => {
   const call = parseCall({
     soin: 'SO-123',
     device_type: 'Laptop',
@@ -108,5 +108,9 @@ test('phone submission timestamp is the source of the exact 47-hour deadline', (
   });
 
   assert.equal(call.relog_due_at, '2026-10-29T04:45:00.000Z');
-  assert.equal(call.mail_sent, false);
+  assert.equal(call.mail_sent, true);
+
+  const updatedCall = parseCall({ mail_sent: false }, call);
+  assert.equal(updatedCall.mail_sent, false);
+  assert.equal(updatedCall.relog_due_at, call.relog_due_at);
 });

@@ -345,7 +345,7 @@ function ServiceCalls({ apiBase, password }) {
       <label className="service-call-filter">TAT status<select className="form-input" value={filters.tat_status} onChange={(event) => updateFilter('tat_status', event.target.value)}><option value="">All</option><option>IN TAT</option><option>TAT Missed</option></select></label>
       <label className="service-call-filter">Call type<select className="form-input" value={filters.call_type} onChange={(event) => updateFilter('call_type', event.target.value)}><option value="">All</option><option>Hardware</option><option>Software</option></select></label>
       <label className="service-call-filter">Parts<select className="form-input" value={filters.part_order_status} onChange={(event) => updateFilter('part_order_status', event.target.value)}><option value="">All</option><option>Ordered</option><option>Not Yet Ordered</option></select></label>
-      <label className="service-call-filter">Mail sent<select className="form-input" value={filters.mail_sent} onChange={(event) => updateFilter('mail_sent', event.target.value)}><option value="">All</option><option value="true">Sent</option><option value="false">Not sent</option></select></label>
+      <label className="service-call-filter">Approval email<select className="form-input" value={filters.mail_sent} onChange={(event) => updateFilter('mail_sent', event.target.value)}><option value="">All</option><option value="true">Sent</option><option value="false">Not sent</option></select></label>
       <button className="btn btn-secondary" onClick={() => { setFilters(INITIAL_FILTERS); setPage(1); }}>Clear filters</button>
     </div>
   );
@@ -385,8 +385,8 @@ function ServiceCalls({ apiBase, password }) {
                   ['Out of Warranty', 'out_of_warranty', 'warranty_status', 'Out of Warranty'],
                   ['Parts ordered', 'parts_ordered', 'part_order_status', 'Ordered'],
                   ['Parts not ordered', 'parts_not_ordered', 'part_order_status', 'Not Yet Ordered'],
-                  ['Mail sent', 'mail_sent', 'mail_sent', 'true'],
-                  ['Mail not sent', 'mail_not_sent', 'mail_sent', 'false']
+                  ['Approval email sent', 'mail_sent', 'mail_sent', 'true'],
+                  ['Approval email not sent', 'mail_not_sent', 'mail_sent', 'false']
                 ].map(([label, key, filterKey, value]) => (
                   <button className="service-call-stat" key={key} onClick={() => filterKey && applyQuickFilter(filterKey, value)}>
                     <span>{label}</span><strong>{dashboard.stats[key] ?? 0}</strong>
@@ -431,14 +431,14 @@ function ServiceCalls({ apiBase, password }) {
             <div className="table-responsive">
               <table className="admin-table service-calls-table">
                 <thead><tr>
-                  <th><button onClick={() => changeSort('soin')}>SOIN</button></th><th>IMEI</th><th>Customer</th><th>Contact</th><th>Model</th><th>Issue</th><th>Warranty</th><th>Type</th><th>Parts</th><th>Mail</th>
+                  <th><button onClick={() => changeSort('soin')}>SOIN</button></th><th>IMEI</th><th>Customer</th><th>Contact</th><th>Model</th><th>Issue</th><th>Warranty</th><th>Type</th><th>Parts</th><th>Approval email</th>
                   <th><button onClick={() => changeSort('submission_at')}>Submission</button></th><th><button onClick={() => changeSort('relog_due_at')}>TAT deadline</button></th>
                   <th>TAT status</th><th>Quotation</th><th>Submitted</th><th>Payment</th><th>Actions</th>
                 </tr></thead>
                 <tbody>{calls.map(call => (
                   <tr key={call.id}>
                     <td><strong>{call.soin}</strong></td><td>{call.imei || '—'}</td><td>{call.customer_name}</td><td>{call.customer_contact}</td><td>{call.model}</td>
-                    <td className="service-call-issue">{call.issue_description}</td><td>{call.warranty_status}</td><td>{call.call_type}</td><td>{call.part_order_status}</td><td>{call.mail_sent ? 'Yes' : 'No'}</td>
+                    <td className="service-call-issue">{call.issue_description}</td><td>{call.warranty_status}</td><td>{call.call_type}</td><td>{call.part_order_status}</td><td>{call.mail_sent ? 'Sent' : 'Not sent'}</td>
                     <td>{formatIndiaDateTime(call.submission_at)}</td><td>{formatIndiaDateTime(call.relog_due_at)}</td><td>{renderTat(call)}</td>
                     <td>{call.quotation_amount == null ? '—' : `₹${Number(call.quotation_amount).toFixed(2)}`}</td>
                     <td>{call.submitted_amount == null ? '—' : `₹${Number(call.submitted_amount).toFixed(2)}`}</td><td>{call.payment_method || '—'}</td>
@@ -474,7 +474,7 @@ function ServiceCalls({ apiBase, password }) {
             <label>Call type<select className="form-input" value={form.call_type} onChange={event => setForm({ ...form, call_type: event.target.value })}><option>Hardware</option><option>Software</option></select></label>
             <label>Part order status<select className="form-input" value={form.part_order_status} onChange={event => setForm({ ...form, part_order_status: event.target.value })}><option>Not Yet Ordered</option><option>Ordered</option></select></label>
             <label>Submission date and time<input className="form-input" type="datetime-local" value={form.submission_at} onChange={event => setForm({ ...form, submission_at: event.target.value })} required /></label>
-            <label className="service-call-checkbox"><input type="checkbox" checked={form.mail_sent} disabled readOnly /> Reminder email sent automatically</label>
+            <label>Parts approval email status<select className="form-input" value={String(form.mail_sent)} onChange={event => setForm({ ...form, mail_sent: event.target.value === 'true' })}><option value="false">Not sent</option><option value="true">Sent</option></select></label>
           </div>
           <label>Issue description<textarea className="form-input" rows="4" value={form.issue_description} onChange={event => setForm({ ...form, issue_description: event.target.value })} maxLength="10000" required /></label>
           {form.warranty_status === 'Out of Warranty' && (
@@ -495,7 +495,7 @@ function ServiceCalls({ apiBase, password }) {
             {[
               ['Device type', selectedCall.device_type], ['IMEI', selectedCall.imei || '—'], ['Customer contact', selectedCall.customer_contact], ['Issue', selectedCall.issue_description],
               ['Warranty', selectedCall.warranty_status], ['Call type', selectedCall.call_type], ['Parts', selectedCall.part_order_status],
-              ['Mail sent', selectedCall.mail_sent ? 'Yes' : 'No'], ['Submission', formatIndiaDateTime(selectedCall.submission_at)],
+              ['Parts approval email', selectedCall.mail_sent ? 'Sent' : 'Not sent'], ['Submission', formatIndiaDateTime(selectedCall.submission_at)],
               ['TAT deadline', formatIndiaDateTime(selectedCall.relog_due_at)],
               ['Quotation', selectedCall.quotation_amount == null ? '—' : `₹${Number(selectedCall.quotation_amount).toFixed(2)}`],
               ['Submitted amount', selectedCall.submitted_amount == null ? '—' : `₹${Number(selectedCall.submitted_amount).toFixed(2)}`],

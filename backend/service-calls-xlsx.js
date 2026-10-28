@@ -10,7 +10,7 @@ const COLUMNS = [
   ['Warranty Status', 'warranty_status'],
   ['Call Type', 'call_type'],
   ['Part Order Status', 'part_order_status'],
-  ['Mail Sent', 'mail_sent'],
+  ['Parts Approval Email Sent', 'mail_sent'],
   ['Submission Date', 'submission_date', 'date'],
   ['Submission Time', 'submission_time', 'time'],
   ['TAT Deadline', 'relog_due_at', 'timestamp'],

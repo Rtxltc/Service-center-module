@@ -113,6 +113,9 @@ const parseCall = (input, existing = null, administratorId = null) => {
   if (!PART_STATUSES.includes(merged.part_order_status)) {
     throw Object.assign(new Error('part_order_status must be Ordered or Not Yet Ordered'), { status: 400 });
   }
+  if (input.mail_sent !== undefined && typeof input.mail_sent !== 'boolean') {
+    throw Object.assign(new Error('mail_sent must be a boolean'), { status: 400 });
+  }
   const submissionAt = new Date(merged.submission_at);
   if (!merged.submission_at || Number.isNaN(submissionAt.getTime())) {
     throw Object.assign(new Error('submission_at must be a valid date and time'), { status: 400 });
@@ -155,7 +158,7 @@ const parseCall = (input, existing = null, administratorId = null) => {
     warranty_status: merged.warranty_status,
     call_type: merged.call_type,
     part_order_status: merged.part_order_status,
-    mail_sent: existing ? existing.mail_sent : false,
+    mail_sent: input.mail_sent === undefined ? Boolean(existing && existing.mail_sent) : input.mail_sent,
     submission_at: submissionAt.toISOString(),
     relog_due_at: new Date(submissionAt.getTime() + 47 * 60 * 60 * 1000).toISOString(),
     quotation_amount: quotationAmount,
