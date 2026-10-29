@@ -259,20 +259,35 @@ async function supabaseQuery(text, params = []) {
   }
 
   // --- moto_repairs queries ---
+  if (queryNormalized.includes('SELECT * FROM moto_repairs WHERE id = $1')) {
+    const { data, error } = await supabase
+      .from('moto_repairs')
+      .select('*')
+      .eq('id', params[0])
+      .maybeSingle();
+    if (error) throw error;
+    return { rows: data ? [data] : [], rowCount: data ? 1 : 0 };
+  }
+
   if (queryNormalized.includes('SELECT * FROM moto_repairs')) {
     const { data, error } = await supabase
       .from('moto_repairs')
       .select('*')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return { rows: data, rowCount: data ? data.length : 0 };
+    const rows = (data || []).map(repair => ({
+      ...repair,
+      cash_collected: repair.cash_collected ?? (repair.payment_method === 'QR' ? 0 : repair.amount_collected || 0),
+      qr_collected: repair.qr_collected ?? (repair.payment_method === 'QR' ? repair.amount_collected || 0 : 0)
+    }));
+    return { rows, rowCount: rows.length };
   }
 
   if (queryNormalized.includes('INSERT INTO moto_repairs')) {
     const [
       ticket_id, brand, soin, device_model, issue_description, customer_name,
       customer_email, customer_phone, customer_address, service_type,
-      status, amount_collected, payment_method, warranty_status, receiving_date, giving_date
+      status, amount_collected, cash_collected, qr_collected, warranty_status, receiving_date, giving_date
     ] = params;
 
     const { data, error } = await supabase
@@ -290,7 +305,8 @@ async function supabaseQuery(text, params = []) {
         service_type: service_type || 'Walk-in',
         status: status || 'Received',
         amount_collected: parseFloat(amount_collected || 0),
-        payment_method: payment_method || 'Cash',
+        cash_collected: parseFloat(cash_collected || 0),
+        qr_collected: parseFloat(qr_collected || 0),
         warranty_status: warranty_status || 'Out of Warranty',
         receiving_date: receiving_date || new Date().toISOString(),
         giving_date: giving_date || null
@@ -304,7 +320,7 @@ async function supabaseQuery(text, params = []) {
     const [
       soin, device_model, issue_description, customer_name, customer_email,
       customer_phone, customer_address, service_type, status,
-      amount_collected, payment_method, warranty_status, receiving_date, giving_date, id
+      amount_collected, cash_collected, qr_collected, warranty_status, receiving_date, giving_date, id
     ] = params;
 
     const { data, error } = await supabase
@@ -320,7 +336,8 @@ async function supabaseQuery(text, params = []) {
         service_type,
         status,
         amount_collected: parseFloat(amount_collected || 0),
-        payment_method: payment_method || 'Cash',
+        cash_collected: parseFloat(cash_collected || 0),
+        qr_collected: parseFloat(qr_collected || 0),
         warranty_status,
         receiving_date,
         giving_date,
@@ -476,14 +493,24 @@ async function supabaseQuery(text, params = []) {
   }
 
   // --- Aggregate overview queries ---
-  if (queryNormalized.includes('SUM(amount_collected)') && queryNormalized.includes('moto_repairs')) {
-    const paymentMethod = queryNormalized.match(/payment_method\s*=\s*'(cash|qr)'/i)?.[1] || 'Cash';
+  if (queryNormalized.includes('SUM(cash_collected)') && queryNormalized.includes('moto_repairs')) {
     const { data, error } = await supabase
       .from('moto_repairs')
-      .select('amount_collected')
-      .eq('payment_method', paymentMethod);
+      .select('cash_collected')
+      .gt('cash_collected', 0);
     if (error) throw error;
-    const total = data ? data.reduce((sum, row) => sum + parseFloat(row.amount_collected || 0), 0) : 0;
+    const total = data ? data.reduce((sum, row) => sum + parseFloat(row.cash_collected || 0), 0) : 0;
+    const count = data ? data.length : 0;
+    return { rows: [{ total, count }], rowCount: 1 };
+  }
+
+  if (queryNormalized.includes('SUM(qr_collected)') && queryNormalized.includes('moto_repairs')) {
+    const { data, error } = await supabase
+      .from('moto_repairs')
+      .select('qr_collected')
+      .gt('qr_collected', 0);
+    if (error) throw error;
+    const total = data ? data.reduce((sum, row) => sum + parseFloat(row.qr_collected || 0), 0) : 0;
     const count = data ? data.length : 0;
     return { rows: [{ total, count }], rowCount: 1 };
   }
@@ -615,12 +642,18 @@ async function mockQuery(text, params = []) {
 
   // --- moto_repairs mock queries ---
   if (text.includes('SELECT * FROM moto_repairs')) {
-    const list = [...(data.moto_repairs || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const list = [...(data.moto_repairs || [])]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .map(repair => ({
+        ...repair,
+        cash_collected: repair.cash_collected ?? (repair.payment_method === 'QR' ? 0 : repair.amount_collected || 0),
+        qr_collected: repair.qr_collected ?? (repair.payment_method === 'QR' ? repair.amount_collected || 0 : 0)
+      }));
     return { rows: list, rowCount: list.length };
   }
 
   if (text.includes('INSERT INTO moto_repairs')) {
-    const [ticket_id, brand, soin, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, payment_method, warranty_status, receiving_date, giving_date] = params;
+    const [ticket_id, brand, soin, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, cash_collected, qr_collected, warranty_status, receiving_date, giving_date] = params;
     const newId = data.moto_repairs && data.moto_repairs.length > 0 ? Math.max(...data.moto_repairs.map(r => r.id)) + 1 : 1;
     const newRepair = {
       id: newId,
@@ -636,7 +669,8 @@ async function mockQuery(text, params = []) {
       service_type: service_type || 'Walk-in',
       status: status || 'Received',
       amount_collected: parseFloat(amount_collected || 0),
-      payment_method: payment_method || 'Cash',
+      cash_collected: parseFloat(cash_collected || 0),
+      qr_collected: parseFloat(qr_collected || 0),
       warranty_status: warranty_status || 'Out of Warranty',
       receiving_date: receiving_date || new Date().toISOString(),
       giving_date: giving_date || null,
@@ -650,7 +684,7 @@ async function mockQuery(text, params = []) {
   }
 
   if (text.includes('UPDATE moto_repairs')) {
-    const [soin, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, payment_method, warranty_status, receiving_date, giving_date, id] = params;
+    const [soin, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, cash_collected, qr_collected, warranty_status, receiving_date, giving_date, id] = params;
     const idx = data.moto_repairs ? data.moto_repairs.findIndex(r => r.id === parseInt(id)) : -1;
     if (idx === -1) return { rows: [], rowCount: 0 };
     data.moto_repairs[idx] = {
@@ -665,7 +699,8 @@ async function mockQuery(text, params = []) {
       service_type,
       status,
       amount_collected: parseFloat(amount_collected || 0),
-      payment_method: payment_method || 'Cash',
+      cash_collected: parseFloat(cash_collected || 0),
+      qr_collected: parseFloat(qr_collected || 0),
       warranty_status,
       receiving_date,
       giving_date,
@@ -797,12 +832,21 @@ async function mockQuery(text, params = []) {
     return { rows: deleted, rowCount: 1 };
   }
 
-  if (text.includes('SUM(amount_collected)') && text.includes('moto_repairs')) {
-    const paymentMethod = text.match(/payment_method\s*=\s*'(cash|qr)'/i)?.[1] || 'Cash';
-    const repairs = (data.moto_repairs || []).filter(repair => (
-      String(repair.payment_method || 'Cash').toLowerCase() === paymentMethod.toLowerCase()
-    ));
-    const total = repairs.reduce((sum, repair) => sum + parseFloat(repair.amount_collected || 0), 0);
+  if (text.includes('SUM(cash_collected)') && text.includes('moto_repairs')) {
+    const repairs = (data.moto_repairs || []).map(repair => ({
+      ...repair,
+      cash_collected: repair.cash_collected ?? (repair.payment_method === 'QR' ? 0 : repair.amount_collected || 0)
+    })).filter(repair => Number(repair.cash_collected || 0) > 0);
+    const total = repairs.reduce((sum, repair) => sum + parseFloat(repair.cash_collected || 0), 0);
+    return { rows: [{ total, count: repairs.length }], rowCount: 1 };
+  }
+
+  if (text.includes('SUM(qr_collected)') && text.includes('moto_repairs')) {
+    const repairs = (data.moto_repairs || []).map(repair => ({
+      ...repair,
+      qr_collected: repair.qr_collected ?? (repair.payment_method === 'QR' ? repair.amount_collected || 0 : 0)
+    })).filter(repair => Number(repair.qr_collected || 0) > 0);
+    const total = repairs.reduce((sum, repair) => sum + parseFloat(repair.qr_collected || 0), 0);
     return { rows: [{ total, count: repairs.length }], rowCount: 1 };
   }
 

@@ -1774,7 +1774,8 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
     service_type: 'Walk-in',
     status: 'Received',
     amount_collected: 0,
-    payment_method: 'Cash',
+    cash_collected: 0,
+    qr_collected: 0,
     warranty_status: 'Out of Warranty',
     receiving_date: new Date().toISOString().substring(0, 16),
     giving_date: ''
@@ -1975,7 +1976,8 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
         service_type: repair.service_type,
         status: repair.status,
         amount_collected: repair.amount_collected,
-        payment_method: repair.payment_method || 'Cash',
+        cash_collected: repair.cash_collected ?? (repair.payment_method === 'QR' ? 0 : repair.amount_collected || 0),
+        qr_collected: repair.qr_collected ?? (repair.payment_method === 'QR' ? repair.amount_collected || 0 : 0),
         warranty_status: repair.warranty_status,
         receiving_date: repair.receiving_date ? repair.receiving_date.substring(0, 16) : new Date().toISOString().substring(0, 16),
         giving_date: repair.giving_date ? repair.giving_date.substring(0, 16) : ''
@@ -1994,7 +1996,8 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
         service_type: 'Walk-in',
         status: 'Received',
         amount_collected: 0,
-        payment_method: 'Cash',
+        cash_collected: 0,
+        qr_collected: 0,
         warranty_status: 'Out of Warranty',
         receiving_date: new Date().toISOString().substring(0, 16),
         giving_date: ''
@@ -2019,7 +2022,13 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
           'Content-Type': 'application/json',
           'x-admin-password': password
         },
-        body: JSON.stringify(repairForm)
+        body: JSON.stringify(endpoint === 'moto'
+          ? {
+            ...repairForm,
+            cash_collected: Number(repairForm.cash_collected || 0),
+            qr_collected: Number(repairForm.qr_collected || 0)
+          }
+          : repairForm)
       });
 
       if (response.ok) {
@@ -2561,8 +2570,8 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                     <th>Phone / Address</th>
                     <th>Warranty</th>
                     <th>Dates (Recv to Delv)</th>
-                    <th>Amount (₹)</th>
-                    <th>Payment</th>
+                    <th>Cash (₹)</th>
+                    <th>QR (₹)</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -2596,8 +2605,8 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                           <div style={{ fontSize: '0.75rem' }}>Recv: {repair.receiving_date ? new Date(repair.receiving_date).toLocaleDateString() : 'N/A'}</div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Delv: {repair.giving_date ? new Date(repair.giving_date).toLocaleDateString() : 'Pending'}</div>
                         </td>
-                        <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{parseFloat(repair.amount_collected || 0).toFixed(2)}</td>
-                        <td>{repair.payment_method || 'Cash'}</td>
+                        <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{parseFloat(repair.cash_collected ?? (repair.payment_method === 'QR' ? 0 : repair.amount_collected) ?? 0).toFixed(2)}</td>
+                        <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{parseFloat(repair.qr_collected ?? (repair.payment_method === 'QR' ? repair.amount_collected : 0) ?? 0).toFixed(2)}</td>
                         <td>
                           <span className={`status-badge ${repair.status?.toLowerCase().replace(/\s+/g, '-')}`} style={{ 
                             fontSize: '0.75rem', 
@@ -3103,12 +3112,14 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Amount Collected (₹)</label>
-                  <input 
+                  <label className="form-label">{repairForm.brand === 'Motorola' ? 'Cash Received (₹)' : 'Amount Collected (₹)'}</label>
+                  <input
                     type="number" 
                     className="form-input" 
-                    value={repairForm.amount_collected} 
-                    onChange={(e) => setRepairForm({ ...repairForm, amount_collected: parseFloat(e.target.value) || 0 })} 
+                    value={repairForm.brand === 'Motorola' ? repairForm.cash_collected : repairForm.amount_collected}
+                    onChange={(e) => setRepairForm(repairForm.brand === 'Motorola'
+                      ? { ...repairForm, cash_collected: e.target.value }
+                      : { ...repairForm, amount_collected: parseFloat(e.target.value) || 0 })}
                     min="0"
                     step="0.01"
                   />
@@ -3121,22 +3132,23 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                       value={repairForm.soin || ''}
                       onChange={(e) => setRepairForm({ ...repairForm, soin: e.target.value })}
                       maxLength="100"
-                      placeholder="Enter SOIN"
+                      placeholder="Enter SOIN for these payments"
                     />
+                    <small>Enter the SOIN when recording cash or QR payments.</small>
                   </div>
                 )}
                 {repairForm.brand === 'Motorola' && (
                   <div className="form-group">
-                    <label className="form-label">Payment Method</label>
-                    <select
+                    <label className="form-label">QR Received (₹)</label>
+                    <input
+                      type="number"
                       className="form-input"
-                      value={repairForm.payment_method || 'Cash'}
-                      onChange={(e) => setRepairForm({ ...repairForm, payment_method: e.target.value })}
-                    >
-                      <option value="Cash">Cash</option>
-                      <option value="QR">QR</option>
-                    </select>
-                    <small>QR payments are tracked separately and excluded from income.</small>
+                      value={repairForm.qr_collected}
+                      onChange={(e) => setRepairForm({ ...repairForm, qr_collected: e.target.value })}
+                      min="0"
+                      step="0.01"
+                    />
+                    <small>Both amounts are recorded against this SOIN. Only cash is counted as income.</small>
                   </div>
                 )}
               </div>
