@@ -258,6 +258,7 @@ app.post('/api/admin/moto', checkAdminAuth, async (req, res) => {
     service_type,
     status,
     amount_collected,
+    payment_method,
     warranty_status,
     receiving_date,
     giving_date
@@ -266,6 +267,9 @@ app.post('/api/admin/moto', checkAdminAuth, async (req, res) => {
   if (!device_model || !customer_name || !customer_phone) {
     return res.status(400).json({ error: 'Device model, customer name, and phone are required' });
   }
+  if (payment_method !== undefined && !['Cash', 'QR'].includes(payment_method)) {
+    return res.status(400).json({ error: 'Payment method must be Cash or QR' });
+  }
 
   try {
     const ticketId = generateTicketId('Motorola');
@@ -273,8 +277,8 @@ app.post('/api/admin/moto', checkAdminAuth, async (req, res) => {
       INSERT INTO moto_repairs (
         ticket_id, brand, device_model, issue_description, customer_name, 
         customer_email, customer_phone, customer_address, service_type, 
-        status, amount_collected, warranty_status, receiving_date, giving_date
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        status, amount_collected, payment_method, warranty_status, receiving_date, giving_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
     `;
     const values = [
@@ -289,6 +293,7 @@ app.post('/api/admin/moto', checkAdminAuth, async (req, res) => {
       service_type || 'Walk-in',
       status || 'Received',
       amount_collected !== undefined ? parseFloat(amount_collected) : 0.00,
+      payment_method || 'Cash',
       warranty_status || 'Out of Warranty',
       parseDbDate(receiving_date) || new Date().toISOString(),
       parseDbDate(giving_date)
@@ -312,6 +317,9 @@ app.put('/api/admin/moto/:id', checkAdminAuth, async (req, res) => {
     }
     const existing = getRes.rows[0];
     const merged = { ...existing, ...req.body };
+    if (!['Cash', 'QR'].includes(merged.payment_method || 'Cash')) {
+      return res.status(400).json({ error: 'Payment method must be Cash or QR' });
+    }
 
     const queryText = `
       UPDATE moto_repairs SET
@@ -324,11 +332,12 @@ app.put('/api/admin/moto/:id', checkAdminAuth, async (req, res) => {
         service_type = $7,
         status = $8,
         amount_collected = $9,
-        warranty_status = $10,
-        receiving_date = $11,
-        giving_date = $12,
+        payment_method = $10,
+        warranty_status = $11,
+        receiving_date = $12,
+        giving_date = $13,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $13
+      WHERE id = $14
       RETURNING *
     `;
     const values = [
@@ -341,6 +350,7 @@ app.put('/api/admin/moto/:id', checkAdminAuth, async (req, res) => {
       merged.service_type,
       merged.status,
       merged.amount_collected !== undefined ? parseFloat(merged.amount_collected) : 0.00,
+      merged.payment_method || 'Cash',
       merged.warranty_status,
       parseDbDate(merged.receiving_date) || new Date().toISOString(),
       parseDbDate(merged.giving_date),
@@ -600,11 +610,13 @@ app.delete('/api/admin/expenses/:id', checkAdminAuth, async (req, res) => {
 // GET Financial Overview (Aggregates sum metrics from DB tables)
 app.get('/api/admin/overview', checkAdminAuth, async (req, res) => {
   try {
-    const motoSumQuery = await db.query('SELECT COALESCE(SUM(amount_collected), 0) as total, COUNT(*) as count FROM moto_repairs');
+    const motoSumQuery = await db.query("SELECT COALESCE(SUM(amount_collected), 0) as total, COUNT(*) as count FROM moto_repairs WHERE payment_method = 'Cash'");
+    const motoQrSumQuery = await db.query("SELECT COALESCE(SUM(amount_collected), 0) as total, COUNT(*) as count FROM moto_repairs WHERE payment_method = 'QR'");
     const nonMotoSumQuery = await db.query('SELECT COALESCE(SUM(amount_collected), 0) as total, COUNT(*) as count FROM laptop_repairs');
     const expensesSumQuery = await db.query('SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count FROM expenses');
 
     const motoRevenue = parseFloat(motoSumQuery.rows[0].total);
+    const motoQrRevenue = parseFloat(motoQrSumQuery.rows[0].total);
     const nonMotoRevenue = parseFloat(nonMotoSumQuery.rows[0].total);
     const totalRevenue = motoRevenue + nonMotoRevenue;
     const totalExpenses = parseFloat(expensesSumQuery.rows[0].total);
@@ -612,11 +624,13 @@ app.get('/api/admin/overview', checkAdminAuth, async (req, res) => {
 
     res.json({
       motoRevenue,
+      motoQrRevenue,
       nonMotoRevenue,
       totalRevenue,
       totalExpenses,
       netProfit,
       motoCount: parseInt(motoSumQuery.rows[0].count),
+      motoQrCount: parseInt(motoQrSumQuery.rows[0].count),
       nonMotoCount: parseInt(nonMotoSumQuery.rows[0].count),
       expensesCount: parseInt(expensesSumQuery.rows[0].count)
     });

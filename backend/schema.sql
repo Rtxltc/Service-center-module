@@ -42,12 +42,22 @@ CREATE TABLE IF NOT EXISTS moto_repairs (
     service_type VARCHAR(50) DEFAULT 'Walk-in',
     status VARCHAR(50) DEFAULT 'Received',
     amount_collected NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    payment_method VARCHAR(10) NOT NULL DEFAULT 'Cash' CHECK (payment_method IN ('Cash', 'QR')),
     warranty_status VARCHAR(100) DEFAULT 'Out of Warranty',
     receiving_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     giving_date TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE moto_repairs
+    ADD COLUMN IF NOT EXISTS payment_method VARCHAR(10) NOT NULL DEFAULT 'Cash';
+
+ALTER TABLE moto_repairs
+    DROP CONSTRAINT IF EXISTS moto_repairs_payment_method_check;
+ALTER TABLE moto_repairs
+    ADD CONSTRAINT moto_repairs_payment_method_check
+        CHECK (payment_method IN ('Cash', 'QR'));
 
 -- Index on moto_repairs ticket_id and phone
 CREATE INDEX IF NOT EXISTS idx_moto_repairs_ticket ON moto_repairs(ticket_id);

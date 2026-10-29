@@ -1773,6 +1773,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
     service_type: 'Walk-in',
     status: 'Received',
     amount_collected: 0,
+    payment_method: 'Cash',
     warranty_status: 'Out of Warranty',
     receiving_date: new Date().toISOString().substring(0, 16),
     giving_date: ''
@@ -1972,6 +1973,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
         service_type: repair.service_type,
         status: repair.status,
         amount_collected: repair.amount_collected,
+        payment_method: repair.payment_method || 'Cash',
         warranty_status: repair.warranty_status,
         receiving_date: repair.receiving_date ? repair.receiving_date.substring(0, 16) : new Date().toISOString().substring(0, 16),
         giving_date: repair.giving_date ? repair.giving_date.substring(0, 16) : ''
@@ -1989,6 +1991,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
         service_type: 'Walk-in',
         status: 'Received',
         amount_collected: 0,
+        payment_method: 'Cash',
         warranty_status: 'Out of Warranty',
         receiving_date: new Date().toISOString().substring(0, 16),
         giving_date: ''
@@ -2555,6 +2558,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                     <th>Warranty</th>
                     <th>Dates (Recv to Delv)</th>
                     <th>Amount (₹)</th>
+                    <th>Payment</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -2588,6 +2592,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Delv: {repair.giving_date ? new Date(repair.giving_date).toLocaleDateString() : 'Pending'}</div>
                         </td>
                         <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{parseFloat(repair.amount_collected || 0).toFixed(2)}</td>
+                        <td>{repair.payment_method || 'Cash'}</td>
                         <td>
                           <span className={`status-badge ${repair.status?.toLowerCase().replace(/\s+/g, '-')}`} style={{ 
                             fontSize: '0.75rem', 
@@ -2832,9 +2837,18 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                   <div style={{ width: '40px', height: '40px', background: 'rgba(2, 132, 199, 0.08)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-moto)', marginBottom: '16px' }}>
                     <Smartphone size={20} />
                   </div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Motorola Income</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Motorola Cash Income</span>
                   <h4 style={{ fontSize: '1.6rem', fontWeight: '800', margin: '4px 0 2px' }}>₹{parseFloat(overviewData.motoRevenue).toFixed(2)}</h4>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>From {overviewData.motoCount} repair records</p>
+                </div>
+
+                <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', boxShadow: 'var(--shadow-sm)', textAlign: 'left', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'rgba(124, 58, 237, 0.08)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c3aed', marginBottom: '16px' }}>
+                    <Smartphone size={20} />
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Motorola QR Collections</span>
+                  <h4 style={{ fontSize: '1.6rem', fontWeight: '800', margin: '4px 0 2px' }}>₹{parseFloat(overviewData.motoQrRevenue || 0).toFixed(2)}</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Separate from income · {overviewData.motoQrCount || 0} repair records</p>
                 </div>
 
                 {/* Laptop Card */}
@@ -3094,6 +3108,20 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                     step="0.01"
                   />
                 </div>
+                {repairForm.brand === 'Motorola' && (
+                  <div className="form-group">
+                    <label className="form-label">Payment Method</label>
+                    <select
+                      className="form-input"
+                      value={repairForm.payment_method || 'Cash'}
+                      onChange={(e) => setRepairForm({ ...repairForm, payment_method: e.target.value })}
+                    >
+                      <option value="Cash">Cash</option>
+                      <option value="QR">QR</option>
+                    </select>
+                    <small>QR payments are tracked separately and excluded from income.</small>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', textAlign: 'left' }}>
