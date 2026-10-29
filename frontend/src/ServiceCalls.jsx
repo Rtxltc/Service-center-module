@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const INITIAL_FILTERS = {
   search: '',
@@ -143,6 +143,9 @@ function ServiceCalls({ apiBase, password }) {
   const [modelCode, setModelCode] = useState('');
   const [modelLookupBusy, setModelLookupBusy] = useState(false);
   const [modelLookupMessage, setModelLookupMessage] = useState('');
+  const modelLookupSequence = useRef(0);
+  const modelLookupTimer = useRef(null);
+  const findModelNameRef = useRef(null);
   const [editingId, setEditingId] = useState(null);
   const [soinForm, setSoinForm] = useState({ soin: '', reason: '' });
   const [soinModalOpen, setSoinModalOpen] = useState(false);
@@ -284,17 +287,23 @@ function ServiceCalls({ apiBase, password }) {
     setView('form');
   };
 
-  const findModelName = async () => {
-    const code = modelCode.trim();
+  const findModelName = async (value = modelCode) => {
+    if (modelLookupTimer.current) {
+      window.clearTimeout(modelLookupTimer.current);
+      modelLookupTimer.current = null;
+    }
+    const sequence = ++modelLookupSequence.current;
+    const code = value.trim();
     if (!code) {
       setModelLookupMessage('Enter a model code first.');
       return;
     }
     setModelLookupBusy(true);
-    setModelLookupMessage('');
+    setModelLookupMessage('Searching for model name…');
     try {
       const response = await request(`/service-calls/model-name?code=${encodeURIComponent(code)}`);
       const result = await response.json();
+      if (sequence !== modelLookupSequence.current) return;
       if (!result.name) {
         setModelLookupMessage('No unique model match found. Enter the model name manually.');
         return;
@@ -302,11 +311,31 @@ function ServiceCalls({ apiBase, password }) {
       setForm(current => ({ ...current, model: result.name }));
       setModelLookupMessage(`Detected: ${result.name}`);
     } catch (reason) {
-      setModelLookupMessage(reason.message || 'Model lookup is temporarily unavailable.');
+      if (sequence === modelLookupSequence.current) {
+        setModelLookupMessage(reason.message || 'Model lookup is temporarily unavailable.');
+      }
     } finally {
-      setModelLookupBusy(false);
+      if (sequence === modelLookupSequence.current) setModelLookupBusy(false);
     }
   };
+  findModelNameRef.current = findModelName;
+
+  useEffect(() => {
+    const code = modelCode.trim();
+    if (view !== 'form' || form.device_type !== 'Mobile' || code.length < 3) return undefined;
+
+    modelLookupTimer.current = window.setTimeout(() => {
+      modelLookupTimer.current = null;
+      findModelNameRef.current(code);
+    }, 500);
+    return () => {
+      if (modelLookupTimer.current) {
+        window.clearTimeout(modelLookupTimer.current);
+        modelLookupTimer.current = null;
+      }
+      modelLookupSequence.current += 1;
+    };
+  }, [form.device_type, modelCode, view]);
 
   const openDetails = async (call) => {
     setLoading(true);
@@ -701,16 +730,16 @@ function ServiceCalls({ apiBase, password }) {
           <h4>{editingId ? 'Edit service call' : 'Add service call'}</h4>
           <div className="service-call-form-grid">
             <label>SOIN<input className="form-input" value={form.soin} onChange={event => setForm({ ...form, soin: event.target.value })} maxLength="100" required disabled={Boolean(editingId)} />{editingId && <small>Use Update SOIN from the call list or details.</small>}</label>
-            <label>Device type<select className="form-input" value={form.device_type} onChange={event => setForm({ ...form, device_type: event.target.value })}><option>Mobile</option><option>Laptop</option></select></label>
+            <label>Device type<select className="form-input" value={form.device_type} onChange={event => { modelLookupSequence.current += 1; setModelLookupBusy(false); setForm({ ...form, device_type: event.target.value }); }}><option>Mobile</option><option>Laptop</option></select></label>
             <label>IMEI {form.device_type === 'Laptop' ? '(optional for laptops)' : '(required for mobiles)'}<input className="form-input" inputMode="numeric" pattern="[0-9]{15}" maxLength="15" value={form.imei} onChange={event => setForm({ ...form, imei: event.target.value })} required={form.device_type === 'Mobile'} /></label>
             <label>Customer name<input className="form-input" value={form.customer_name} onChange={event => setForm({ ...form, customer_name: event.target.value })} maxLength="150" required /></label>
             <label>Customer contact<input className="form-input" type="tel" value={form.customer_contact} onChange={event => setForm({ ...form, customer_contact: event.target.value })} required /></label>
-            <label>Model code (optional)<input className="form-input" value={modelCode} onChange={event => { setModelCode(event.target.value); setModelLookupMessage(''); }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); findModelName(); } }} maxLength="100" placeholder="e.g. XT2429-2" /></label>
+            <label>Model code (optional)<input className="form-input" value={modelCode} onChange={event => { modelLookupSequence.current += 1; setModelLookupBusy(false); setModelCode(event.target.value); setModelLookupMessage(''); }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); findModelName(); } }} maxLength="100" placeholder="e.g. XT2429-2" /></label>
             <div className="service-call-model-lookup">
               <button className="btn btn-secondary" type="button" onClick={findModelName} disabled={modelLookupBusy || form.device_type !== 'Mobile'}>
                 {modelLookupBusy ? 'Finding model…' : 'Find model name'}
               </button>
-              {modelLookupMessage && <small role="status">{modelLookupMessage}</small>}
+              <small role="status">{modelLookupMessage || 'Lookup starts automatically when you pause typing.'}</small>
             </div>
             <label>Device model<input className="form-input" value={form.model} onChange={event => setForm({ ...form, model: event.target.value })} maxLength="150" required /></label>
             <label>Warranty status<select className="form-input" value={form.warranty_status} onChange={event => setForm({ ...form, warranty_status: event.target.value })}><option>In Warranty</option><option>Out of Warranty</option></select></label>
