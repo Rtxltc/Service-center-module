@@ -1,0 +1,2 @@
+ALTER TABLE moto_repairs
+    ADD COLUMN IF NOT EXISTS soin VARCHAR(100);

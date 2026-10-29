@@ -249,6 +249,7 @@ app.get('/api/admin/moto', checkAdminAuth, async (req, res) => {
 // POST Motorola repair
 app.post('/api/admin/moto', checkAdminAuth, async (req, res) => {
   const {
+    soin,
     device_model,
     issue_description,
     customer_name,
@@ -267,6 +268,9 @@ app.post('/api/admin/moto', checkAdminAuth, async (req, res) => {
   if (!device_model || !customer_name || !customer_phone) {
     return res.status(400).json({ error: 'Device model, customer name, and phone are required' });
   }
+  if (soin != null && (typeof soin !== 'string' || soin.trim().length > 100)) {
+    return res.status(400).json({ error: 'SOIN must be 100 characters or fewer' });
+  }
   if (payment_method !== undefined && !['Cash', 'QR'].includes(payment_method)) {
     return res.status(400).json({ error: 'Payment method must be Cash or QR' });
   }
@@ -275,15 +279,16 @@ app.post('/api/admin/moto', checkAdminAuth, async (req, res) => {
     const ticketId = generateTicketId('Motorola');
     const queryText = `
       INSERT INTO moto_repairs (
-        ticket_id, brand, device_model, issue_description, customer_name, 
+        ticket_id, brand, soin, device_model, issue_description, customer_name,
         customer_email, customer_phone, customer_address, service_type, 
         status, amount_collected, payment_method, warranty_status, receiving_date, giving_date
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *
     `;
     const values = [
       ticketId,
       'Motorola',
+      soin?.trim() || null,
       device_model,
       issue_description || '',
       customer_name,
@@ -317,30 +322,35 @@ app.put('/api/admin/moto/:id', checkAdminAuth, async (req, res) => {
     }
     const existing = getRes.rows[0];
     const merged = { ...existing, ...req.body };
+    if (merged.soin != null && (typeof merged.soin !== 'string' || merged.soin.trim().length > 100)) {
+      return res.status(400).json({ error: 'SOIN must be 100 characters or fewer' });
+    }
     if (!['Cash', 'QR'].includes(merged.payment_method || 'Cash')) {
       return res.status(400).json({ error: 'Payment method must be Cash or QR' });
     }
 
     const queryText = `
       UPDATE moto_repairs SET
-        device_model = $1,
-        issue_description = $2,
-        customer_name = $3,
-        customer_email = $4,
-        customer_phone = $5,
-        customer_address = $6,
-        service_type = $7,
-        status = $8,
-        amount_collected = $9,
-        payment_method = $10,
-        warranty_status = $11,
-        receiving_date = $12,
-        giving_date = $13,
+        soin = $1,
+        device_model = $2,
+        issue_description = $3,
+        customer_name = $4,
+        customer_email = $5,
+        customer_phone = $6,
+        customer_address = $7,
+        service_type = $8,
+        status = $9,
+        amount_collected = $10,
+        payment_method = $11,
+        warranty_status = $12,
+        receiving_date = $13,
+        giving_date = $14,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $14
+      WHERE id = $15
       RETURNING *
     `;
     const values = [
+      merged.soin?.trim() || null,
       merged.device_model,
       merged.issue_description,
       merged.customer_name,

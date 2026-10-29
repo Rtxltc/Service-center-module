@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS moto_repairs (
     id SERIAL PRIMARY KEY,
     ticket_id VARCHAR(20) UNIQUE NOT NULL,
     brand VARCHAR(50) DEFAULT 'Motorola',
+    soin VARCHAR(100),
     device_model VARCHAR(100) NOT NULL,
     issue_description TEXT,
     customer_name VARCHAR(100) NOT NULL,
@@ -49,6 +50,9 @@ CREATE TABLE IF NOT EXISTS moto_repairs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE moto_repairs
+    ADD COLUMN IF NOT EXISTS soin VARCHAR(100);
 
 ALTER TABLE moto_repairs
     ADD COLUMN IF NOT EXISTS payment_method VARCHAR(10) NOT NULL DEFAULT 'Cash';

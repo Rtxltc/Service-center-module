@@ -1764,6 +1764,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
   const [currentRepair, setCurrentRepair] = useState(null); // null for Add, object for Edit
   const [repairForm, setRepairForm] = useState({
     brand: 'Motorola',
+    soin: '',
     device_model: '',
     issue_description: '',
     customer_name: '',
@@ -1964,6 +1965,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
       setCurrentRepair(repair);
       setRepairForm({
         brand: repair.brand,
+        soin: repair.soin || '',
         device_model: repair.device_model,
         issue_description: repair.issue_description,
         customer_name: repair.customer_name,
@@ -1982,6 +1984,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
       setCurrentRepair(null);
       setRepairForm({
         brand: isNonMoto ? 'Dell' : 'Motorola',
+        soin: '',
         device_model: '',
         issue_description: '',
         customer_name: '',
@@ -2134,7 +2137,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
   };
 
   const filteredMotoRepairs = motoRepairs.filter(repair => {
-    const matchesSearch = `${repair.device_model} ${repair.customer_name} ${repair.customer_phone}`
+    const matchesSearch = `${repair.soin || ''} ${repair.device_model} ${repair.customer_name} ${repair.customer_phone}`
       .toLowerCase().includes(searchFilter.toLowerCase());
     const matchesStatus = statusFilter ? repair.status === statusFilter : true;
     const matchesWarranty = warrantyFilter ? repair.warranty_status === warrantyFilter : true;
@@ -2509,7 +2512,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
               <input
                 type="text"
                 className="form-input"
-                placeholder="Search model, customer name or phone..."
+                placeholder="Search SOIN, model, customer name or phone..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 style={{ flex: 2, minWidth: '200px', padding: '8px 12px', fontSize: '0.85rem' }}
@@ -2552,6 +2555,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                 <thead>
                   <tr>
                     <th>Ticket ID</th>
+                    <th>SOIN</th>
                     <th>Model</th>
                     <th>Customer Name</th>
                     <th>Phone / Address</th>
@@ -2567,6 +2571,7 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                   {filteredMotoRepairs.map((repair) => (
                       <tr key={repair.id}>
                         <td style={{ fontWeight: '700', color: 'var(--color-moto)' }}>{repair.ticket_id}</td>
+                        <td>{repair.soin || '—'}</td>
                         <td style={{ fontWeight: '600' }}>{repair.device_model}</td>
                         <td>{repair.customer_name}</td>
                         <td>
@@ -3108,6 +3113,18 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                     step="0.01"
                   />
                 </div>
+                {repairForm.brand === 'Motorola' && (
+                  <div className="form-group">
+                    <label className="form-label">SOIN</label>
+                    <input
+                      className="form-input"
+                      value={repairForm.soin || ''}
+                      onChange={(e) => setRepairForm({ ...repairForm, soin: e.target.value })}
+                      maxLength="100"
+                      placeholder="Enter SOIN"
+                    />
+                  </div>
+                )}
                 {repairForm.brand === 'Motorola' && (
                   <div className="form-group">
                     <label className="form-label">Payment Method</label>

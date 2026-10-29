@@ -270,7 +270,7 @@ async function supabaseQuery(text, params = []) {
 
   if (queryNormalized.includes('INSERT INTO moto_repairs')) {
     const [
-      ticket_id, brand, device_model, issue_description, customer_name,
+      ticket_id, brand, soin, device_model, issue_description, customer_name,
       customer_email, customer_phone, customer_address, service_type,
       status, amount_collected, payment_method, warranty_status, receiving_date, giving_date
     ] = params;
@@ -280,6 +280,7 @@ async function supabaseQuery(text, params = []) {
       .insert([{
         ticket_id,
         brand: brand || 'Motorola',
+        soin: soin || null,
         device_model,
         issue_description: issue_description || '',
         customer_name,
@@ -301,7 +302,7 @@ async function supabaseQuery(text, params = []) {
 
   if (queryNormalized.includes('UPDATE moto_repairs')) {
     const [
-      device_model, issue_description, customer_name, customer_email,
+      soin, device_model, issue_description, customer_name, customer_email,
       customer_phone, customer_address, service_type, status,
       amount_collected, payment_method, warranty_status, receiving_date, giving_date, id
     ] = params;
@@ -309,6 +310,7 @@ async function supabaseQuery(text, params = []) {
     const { data, error } = await supabase
       .from('moto_repairs')
       .update({
+        soin: soin || null,
         device_model,
         issue_description,
         customer_name,
@@ -618,12 +620,13 @@ async function mockQuery(text, params = []) {
   }
 
   if (text.includes('INSERT INTO moto_repairs')) {
-    const [ticket_id, brand, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, payment_method, warranty_status, receiving_date, giving_date] = params;
+    const [ticket_id, brand, soin, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, payment_method, warranty_status, receiving_date, giving_date] = params;
     const newId = data.moto_repairs && data.moto_repairs.length > 0 ? Math.max(...data.moto_repairs.map(r => r.id)) + 1 : 1;
     const newRepair = {
       id: newId,
       ticket_id,
       brand: brand || 'Motorola',
+      soin: soin || null,
       device_model,
       issue_description: issue_description || '',
       customer_name,
@@ -647,11 +650,12 @@ async function mockQuery(text, params = []) {
   }
 
   if (text.includes('UPDATE moto_repairs')) {
-    const [device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, payment_method, warranty_status, receiving_date, giving_date, id] = params;
+    const [soin, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, payment_method, warranty_status, receiving_date, giving_date, id] = params;
     const idx = data.moto_repairs ? data.moto_repairs.findIndex(r => r.id === parseInt(id)) : -1;
     if (idx === -1) return { rows: [], rowCount: 0 };
     data.moto_repairs[idx] = {
       ...data.moto_repairs[idx],
+      soin: soin || null,
       device_model,
       issue_description,
       customer_name,
