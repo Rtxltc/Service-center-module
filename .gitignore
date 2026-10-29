@@ -35,3 +35,4 @@ frontend/.vite
 backend/.vite
 frontend/.gitignore
 backend/.gitignore
+ignore_folder

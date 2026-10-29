@@ -140,6 +140,9 @@ function ServiceCalls({ apiBase, password }) {
   const [sortBy, setSortBy] = useState('submission_at');
   const [sortDirection, setSortDirection] = useState('desc');
   const [form, setForm] = useState(EMPTY_FORM);
+  const [modelCode, setModelCode] = useState('');
+  const [modelLookupBusy, setModelLookupBusy] = useState(false);
+  const [modelLookupMessage, setModelLookupMessage] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [soinForm, setSoinForm] = useState({ soin: '', reason: '' });
   const [soinModalOpen, setSoinModalOpen] = useState(false);
@@ -260,11 +263,15 @@ function ServiceCalls({ apiBase, password }) {
   const openNewForm = () => {
     setEditingId(null);
     setForm({ ...EMPTY_FORM, submission_at: inputDateTime() });
+    setModelCode('');
+    setModelLookupMessage('');
     setView('form');
   };
 
   const openEditForm = (call) => {
     setEditingId(call.id);
+    setModelCode('');
+    setModelLookupMessage('');
     setForm({
       ...EMPTY_FORM,
       ...call,
@@ -275,6 +282,30 @@ function ServiceCalls({ apiBase, password }) {
       submission_at: inputDateTime(call.submission_at)
     });
     setView('form');
+  };
+
+  const findModelName = async () => {
+    const code = modelCode.trim();
+    if (!code) {
+      setModelLookupMessage('Enter a model code first.');
+      return;
+    }
+    setModelLookupBusy(true);
+    setModelLookupMessage('');
+    try {
+      const response = await request(`/service-calls/model-name?code=${encodeURIComponent(code)}`);
+      const result = await response.json();
+      if (!result.name) {
+        setModelLookupMessage('No unique model match found. Enter the model name manually.');
+        return;
+      }
+      setForm(current => ({ ...current, model: result.name }));
+      setModelLookupMessage(`Detected: ${result.name}`);
+    } catch (reason) {
+      setModelLookupMessage(reason.message || 'Model lookup is temporarily unavailable.');
+    } finally {
+      setModelLookupBusy(false);
+    }
   };
 
   const openDetails = async (call) => {
@@ -674,6 +705,13 @@ function ServiceCalls({ apiBase, password }) {
             <label>IMEI {form.device_type === 'Laptop' ? '(optional for laptops)' : '(required for mobiles)'}<input className="form-input" inputMode="numeric" pattern="[0-9]{15}" maxLength="15" value={form.imei} onChange={event => setForm({ ...form, imei: event.target.value })} required={form.device_type === 'Mobile'} /></label>
             <label>Customer name<input className="form-input" value={form.customer_name} onChange={event => setForm({ ...form, customer_name: event.target.value })} maxLength="150" required /></label>
             <label>Customer contact<input className="form-input" type="tel" value={form.customer_contact} onChange={event => setForm({ ...form, customer_contact: event.target.value })} required /></label>
+            <label>Model code (optional)<input className="form-input" value={modelCode} onChange={event => { setModelCode(event.target.value); setModelLookupMessage(''); }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); findModelName(); } }} maxLength="100" placeholder="e.g. XT2429-2" /></label>
+            <div className="service-call-model-lookup">
+              <button className="btn btn-secondary" type="button" onClick={findModelName} disabled={modelLookupBusy || form.device_type !== 'Mobile'}>
+                {modelLookupBusy ? 'Finding model…' : 'Find model name'}
+              </button>
+              {modelLookupMessage && <small role="status">{modelLookupMessage}</small>}
+            </div>
             <label>Device model<input className="form-input" value={form.model} onChange={event => setForm({ ...form, model: event.target.value })} maxLength="150" required /></label>
             <label>Warranty status<select className="form-input" value={form.warranty_status} onChange={event => setForm({ ...form, warranty_status: event.target.value })}><option>In Warranty</option><option>Out of Warranty</option></select></label>
             <label>Call type<select className="form-input" value={form.call_type} onChange={event => setForm({ ...form, call_type: event.target.value })}><option>Hardware</option><option>Software</option></select></label>

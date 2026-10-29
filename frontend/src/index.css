@@ -1380,6 +1380,18 @@ textarea.form-input {
   font-weight: 600;
 }
 
+.service-call-model-lookup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 7px;
+}
+
+.service-call-model-lookup small {
+  color: var(--text-secondary);
+}
+
 .service-call-checkbox {
   display: flex !important;
   align-items: center;

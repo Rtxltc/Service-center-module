@@ -1,4 +1,5 @@
 const { buildServiceCallsWorkbook } = require('./service-calls-xlsx');
+const { getPhoneName } = require('./getPhoneName');
 
 const WARRANTY_STATUSES = ['In Warranty', 'Out of Warranty'];
 const CALL_TYPES = ['Hardware', 'Software'];
@@ -232,6 +233,19 @@ const rupeesToPaise = (value) => Math.round(Number(value || 0) * 100);
 
 const registerServiceCallRoutes = (app, db, checkAdminAuth) => {
   const base = '/api/service-calls';
+
+  app.get(`${base}/model-name`, checkAdminAuth, async (req, res) => {
+    const { code } = req.query;
+    if (typeof code !== 'string' || code.length > 100) {
+      return res.status(400).json({ error: 'Provide a model code of 100 characters or fewer.' });
+    }
+    try {
+      res.json({ name: await getPhoneName(code) });
+    } catch (error) {
+      console.error('Failed to resolve device model name:', error);
+      res.status(502).json({ error: 'Model lookup is temporarily unavailable. Enter the model name manually.' });
+    }
+  });
 
   app.get(`${base}/dashboard`, checkAdminAuth, async (req, res) => {
     try {

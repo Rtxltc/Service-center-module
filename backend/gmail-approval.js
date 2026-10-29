@@ -461,7 +461,7 @@ const registerGmailApprovalRoutes = (app, db, checkAdminAuth) => {
         sender: connection?.email || process.env.GMAIL_SENDER_EMAIL || 'ordernu13@gmail.com',
         to: call.approval_email_to || defaultTo,
         cc: call.approval_email_cc || defaultCc,
-        request_text: call.approval_request_text || 'Please replace/provide good display',
+        request_text: call.approval_request_text || 'Request for APPROVAL: ',
         remark: call.approval_remark || 'Physically opened and checked by technician; no trace of physical or liquid damage found, as shown in the attached photos and video.',
         video_link: call.approval_video_link || '',
         subject: buildApprovalSubject(call)
