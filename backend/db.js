@@ -1266,6 +1266,40 @@ const serviceCalls = {
         updated_at: now
       };
       data.service_calls.push(created);
+      if (record.device_type === 'Mobile' && record.warranty_status === 'Out of Warranty') {
+        data.moto_repairs = data.moto_repairs || [];
+        const nextTicketNumber = data.moto_repairs.reduce((maximum, repair) => {
+          const match = /^MOTO-SC-(\d+)$/.exec(repair.ticket_id || '');
+          return match ? Math.max(maximum, Number(match[1])) : maximum;
+        }, 0) + 1;
+        const submittedAmount = Number(record.submitted_amount);
+        const isQrPayment = record.payment_method === 'QR';
+        const repair = {
+          id: data.moto_repairs.reduce((maximum, item) => Math.max(maximum, Number(item.id) || 0), 0) + 1,
+          ticket_id: `MOTO-SC-${nextTicketNumber}`,
+          brand: 'Motorola',
+          soin: record.soin,
+          device_model: record.model,
+          issue_description: record.issue_description,
+          customer_name: record.customer_name,
+          customer_email: null,
+          customer_phone: record.customer_contact,
+          customer_address: null,
+          service_type: 'Walk-in',
+          status: 'Received',
+          amount_collected: submittedAmount,
+          payment_method: record.payment_method,
+          cash_collected: isQrPayment ? 0 : submittedAmount,
+          qr_collected: isQrPayment ? submittedAmount : 0,
+          warranty_status: record.warranty_status,
+          receiving_date: record.submission_at,
+          giving_date: null,
+          source_service_call_id: created.id,
+          created_at: now,
+          updated_at: now
+        };
+        data.moto_repairs.push(repair);
+      }
       writeMockData(data);
       return created;
     }

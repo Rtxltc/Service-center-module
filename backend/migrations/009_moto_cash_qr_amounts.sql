@@ -13,3 +13,4 @@ ALTER TABLE moto_repairs
 ALTER TABLE moto_repairs
     ADD CONSTRAINT moto_repairs_cash_collected_check CHECK (cash_collected >= 0),
     ADD CONSTRAINT moto_repairs_qr_collected_check CHECK (qr_collected >= 0);
+ 
