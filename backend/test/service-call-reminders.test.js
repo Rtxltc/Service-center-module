@@ -10,7 +10,10 @@ const { parseCall } = require('../service-calls');
 
 test('reminder health endpoint verifies scheduler authorization without sending email', async () => {
   const routes = new Map();
-  registerServiceCallReminderRoutes({ get: (path, handler) => routes.set(path, handler) }, {});
+  registerServiceCallReminderRoutes({
+    get: (path, handler) => routes.set(`GET ${path}`, handler),
+    post: (path, handler) => routes.set(`POST ${path}`, handler)
+  }, {});
   const previousEnvironment = {
     CRON_SECRET: process.env.CRON_SECRET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
@@ -39,7 +42,7 @@ test('reminder health endpoint verifies scheduler authorization without sending 
         return this;
       }
     };
-    await routes.get('/api/service-calls/reminders/health')({
+    await routes.get('GET /api/service-calls/reminders/health')({
       get: () => authorization
     }, response);
     return response;
@@ -55,6 +58,76 @@ test('reminder health endpoint verifies scheduler authorization without sending 
     const invalid = await invoke('Bearer wrong-secret');
     assert.equal(invalid.statusCode, 401);
   } finally {
+    Object.entries(previousEnvironment).forEach(([key, value]) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
+});
+
+test('scheduled reminders are sent to the documented mailbox', async () => {
+  const routes = new Map();
+  registerServiceCallReminderRoutes({
+    get: (path, handler) => routes.set(`GET ${path}`, handler),
+    post: (path, handler) => routes.set(`POST ${path}`, handler)
+  }, {
+    serviceCalls: {
+      claimDueReminders: async () => [{
+        id: 7,
+        reminder_cycle: 0,
+        reminder_stage: 0,
+        soin: 'SO-123',
+        customer_name: 'Charom',
+        model: 'Moto Edge',
+        submission_at: '2026-10-27T05:45:00.000Z',
+        relog_due_at: '2026-10-29T04:45:00.000Z'
+      }],
+      completeReminder: async () => true
+    }
+  });
+  const previousEnvironment = {
+    CRON_SECRET: process.env.CRON_SECRET,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+    APP_URL: process.env.APP_URL,
+    EMAIL_ACTION_SECRET: process.env.EMAIL_ACTION_SECRET
+  };
+  const cronSecret = 'cron-secret-used-only-for-the-delivery-test';
+  Object.assign(process.env, {
+    CRON_SECRET: cronSecret,
+    RESEND_API_KEY: 'test-resend-key',
+    RESEND_FROM_EMAIL: 'sender@example.com',
+    APP_URL: 'https://api.example.com',
+    EMAIL_ACTION_SECRET: 'email-action-secret-used-only-for-the-test'
+  });
+  const previousFetch = global.fetch;
+  let requestBody;
+  global.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return { ok: true, text: async () => '' };
+  };
+  const response = {
+    statusCode: 200,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    }
+  };
+
+  try {
+    await routes.get('GET /api/service-calls/reminders')({
+      get: () => `Bearer ${cronSecret}`
+    }, response);
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.body, { sent: 1 });
+    assert.deepEqual(requestBody.to, ['charom.ram.ayodhya@gmail.com']);
+  } finally {
+    global.fetch = previousFetch;
     Object.entries(previousEnvironment).forEach(([key, value]) => {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
