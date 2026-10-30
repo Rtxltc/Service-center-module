@@ -59,9 +59,9 @@ Set these variables in the backend deployment only:
 - `GMAIL_OAUTH_REDIRECT_URI`: the exact callback URI configured above.
 - `GMAIL_OAUTH_STATE_SECRET`: at least 32 characters of random secret data.
 - `GMAIL_TOKEN_ENCRYPTION_KEY`: exactly 64 hexadecimal characters (32 random bytes), used to encrypt the stored refresh token.
-- `GMAIL_SENDER_EMAIL`: expected Google sender account; defaults to `ordernu13@gmail.com`.
+- `GMAIL_SENDER_EMAIL`: expected Google sender account; defaults to `charom.ayodhya.ram@gmail.com`.
 - `GMAIL_APPROVAL_DEFAULT_TO` (optional): comma-separated default To recipients; defaults to `ordernu2@gmail.com,ordernu4@gmail.com`.
-- `GMAIL_APPROVAL_DEFAULT_CC` (optional): comma-separated default Cc recipients; defaults to `ordernu5@gmail.com,ordernu11@gmail.com,ordernu13@gmail.com`.
+- `GMAIL_APPROVAL_DEFAULT_CC` (optional): comma-separated default Cc recipients; defaults to `ordernu5@gmail.com,ordernu11@gmail.com,charom.ayodhya.ram@gmail.com`.
 
 The authorized Google account must match `GMAIL_SENDER_EMAIL`. Connect it using the **Connect Gmail** control in the admin Service Calls page. The refresh token is encrypted before it is stored in the RLS-protected `gmail_oauth_credentials` table; never expose OAuth credentials or encryption keys in the frontend. The consent-screen test mode may expire refresh tokens after seven days; for a continuously connected production sender, complete Google's consent-screen publishing and any verification Google requires.
 

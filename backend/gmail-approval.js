@@ -6,8 +6,8 @@ const MAX_IMAGE_COUNT = 6;
 const MAX_IMAGE_BYTES = 500 * 1024;
 const MAX_TOTAL_IMAGE_BYTES = 2_500 * 1024;
 const EMAIL_PATTERN = /^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/;
-const DEFAULT_TO = ['ordernu2@gmail.com', 'ordernu4@gmail.com'];
-const DEFAULT_CC = ['ordernu5@gmail.com', 'ordernu11@gmail.com', 'ordernu13@gmail.com'];
+const DEFAULT_TO = ['vishal1.dusadh@ril.com', 'Nilesh.Pachauri@ril.com'];
+const DEFAULT_CC = ['Munish42.Kumar@ril.com', 'Atul81.Kumar@ril.com', 'santosh49.yadav@ril.com'];
 
 const readConfiguration = () => {
   const {
@@ -46,7 +46,7 @@ const readConfiguration = () => {
     redirectUri: redirect.href,
     stateSecret,
     encryptionKey: Buffer.from(encryptionKey, 'hex'),
-    expectedSender: (process.env.GMAIL_SENDER_EMAIL || 'ordernu13@gmail.com').trim().toLowerCase()
+    expectedSender: (process.env.GMAIL_SENDER_EMAIL || 'charom.ayodhya.ram@gmail.com').trim().toLowerCase()
   };
 };
 
@@ -366,7 +366,7 @@ const registerGmailApprovalRoutes = (app, db, checkAdminAuth) => {
       res.json({
         connected: Boolean(saved),
         email: saved?.email || null,
-        expected_email: process.env.GMAIL_SENDER_EMAIL || 'ordernu13@gmail.com'
+        expected_email: process.env.GMAIL_SENDER_EMAIL || 'charom.ayodhya.ram@gmail.com'
       });
     } catch (error) {
       console.error('Failed to load Gmail connection status:', error);
@@ -458,7 +458,7 @@ const registerGmailApprovalRoutes = (app, db, checkAdminAuth) => {
       res.json({
         call,
         connected: Boolean(connection),
-        sender: connection?.email || process.env.GMAIL_SENDER_EMAIL || 'ordernu13@gmail.com',
+        sender: connection?.email || process.env.GMAIL_SENDER_EMAIL || 'charom.ayodhya.ram@gmail.com',
         to: call.approval_email_to || defaultTo,
         cc: call.approval_email_cc || defaultCc,
         request_text: call.approval_request_text || 'Request for APPROVAL: ',
