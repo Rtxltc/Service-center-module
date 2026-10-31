@@ -886,6 +886,10 @@ const serviceCallWhere = (filters, values) => {
   };
   if (filters.dateFrom) add('submission_at >= ?::timestamptz', filters.dateFrom);
   if (filters.dateToExclusive) add('submission_at < ?::timestamptz', filters.dateToExclusive);
+  if (filters.soin) {
+    values.push(`%${filters.soin.replace(/[\\%_]/g, '\\$&')}%`);
+    clauses.push(`soin ILIKE $${values.length}`);
+  }
   if (filters.warrantyStatus) add('warranty_status = ?', filters.warrantyStatus);
   if (filters.callType) add('call_type = ?', filters.callType);
   if (filters.partOrderStatus) add('part_order_status = ?', filters.partOrderStatus);
@@ -904,6 +908,10 @@ const serviceCallWhere = (filters, values) => {
 const applySupabaseServiceFilters = (query, filters) => {
   if (filters.dateFrom) query = query.gte('submission_at', filters.dateFrom);
   if (filters.dateToExclusive) query = query.lt('submission_at', filters.dateToExclusive);
+  if (filters.soin) {
+    const pattern = `%${filters.soin.replace(/[\\%_*]/g, '\\$&')}%`;
+    query = query.ilike('soin', pattern);
+  }
   if (filters.warrantyStatus) query = query.eq('warranty_status', filters.warrantyStatus);
   if (filters.callType) query = query.eq('call_type', filters.callType);
   if (filters.partOrderStatus) query = query.eq('part_order_status', filters.partOrderStatus);
@@ -953,6 +961,7 @@ const serviceCalls = {
         const submission = new Date(call.submission_at).getTime();
         const matchesDate = (!filters.dateFrom || submission >= new Date(filters.dateFrom).getTime())
           && (!filters.dateToExclusive || submission < new Date(filters.dateToExclusive).getTime());
+        const matchesSoin = !filters.soin || String(call.soin || '').toLowerCase().includes(filters.soin.toLowerCase());
         const matchesSearch = !search || [call.soin, call.imei, call.second_imei, call.market_name, call.mtm_number, call.customer_name, call.customer_contact, call.model]
           .some(value => String(value || '').toLowerCase().includes(search));
         const matchesWarranty = !filters.warrantyStatus || call.warranty_status === filters.warrantyStatus;
@@ -964,7 +973,7 @@ const serviceCalls = {
         const matchesTat = !filters.tatStatus
           || (filters.tatStatus === 'IN TAT' ? due > now : due <= now);
         const matchesApproaching = !filters.approachingTat || (due > now && due <= now + 6 * 60 * 60 * 1000);
-        return matchesDate && matchesSearch && matchesWarranty && matchesCallType && matchesParts && matchesMail && matchesTat && matchesApproaching;
+        return matchesDate && matchesSoin && matchesSearch && matchesWarranty && matchesCallType && matchesParts && matchesMail && matchesTat && matchesApproaching;
       });
       rows.sort((a, b) => {
         const field = sortBy === 'soin' ? 'soin' : sortBy === 'relog_due_at' ? 'relog_due_at' : 'submission_at';
@@ -1015,6 +1024,7 @@ const serviceCalls = {
         const due = new Date(call.relog_due_at).getTime();
         return (!filters.dateFrom || submission >= new Date(filters.dateFrom).getTime())
           && (!filters.dateToExclusive || submission < new Date(filters.dateToExclusive).getTime())
+          && (!filters.soin || String(call.soin || '').toLowerCase().includes(filters.soin.toLowerCase()))
           && (!search || [call.soin, call.imei, call.second_imei, call.market_name, call.mtm_number, call.customer_name, call.customer_contact, call.model]
             .some(value => String(value || '').toLowerCase().includes(search)))
           && (!filters.warrantyStatus || call.warranty_status === filters.warrantyStatus)

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 const INITIAL_FILTERS = {
   search: '',
+  soin: '',
   date_from: '',
   date_to: '',
   warranty_status: '',
@@ -522,7 +523,7 @@ function ServiceCalls({ apiBase, password }) {
     setNotice('');
     try {
       const params = new URLSearchParams();
-      ['date_from', 'date_to', 'warranty_status', 'tat_status', 'call_type', 'part_order_status', 'mail_sent', 'approaching_tat', 'search']
+      ['date_from', 'date_to', 'soin', 'warranty_status', 'tat_status', 'call_type', 'part_order_status', 'mail_sent', 'approaching_tat', 'search']
         .forEach(key => { if (filters[key]) params.set(key, filters[key]); });
       const response = await request(`/service-calls/export?${params.toString()}`);
       const blob = await response.blob();
@@ -597,7 +598,8 @@ function ServiceCalls({ apiBase, password }) {
 
   const renderFilters = () => (
     <div className="service-call-filters">
-      <label className="service-call-filter service-call-search">Search<input className="form-input" value={filters.search} placeholder="SOIN, IMEI/MTM, market, customer, contact, model" onChange={(event) => updateFilter('search', event.target.value)} /></label>
+      <label className="service-call-filter">SOIN<input className="form-input" value={filters.soin} maxLength="100" placeholder="Full or partial SOIN" onChange={(event) => updateFilter('soin', event.target.value)} /></label>
+      <label className="service-call-filter service-call-search">Search<input className="form-input" value={filters.search} placeholder="IMEI/MTM, market, customer, contact, model" onChange={(event) => updateFilter('search', event.target.value)} /></label>
       {renderDateFilters()}
       <label className="service-call-filter">Warranty<select className="form-input" value={filters.warranty_status} onChange={(event) => updateFilter('warranty_status', event.target.value)}><option value="">All</option><option>In Warranty</option><option>Out of Warranty</option></select></label>
       <label className="service-call-filter">TAT status<select className="form-input" value={filters.tat_status} onChange={(event) => updateFilter('tat_status', event.target.value)}><option value="">All</option><option>IN TAT</option><option>TAT Missed</option></select></label>
@@ -670,7 +672,7 @@ function ServiceCalls({ apiBase, password }) {
                           <td>{call.soin}</td><td>{call.customer_name}</td><td>{call.model}</td>
                           <td>{formatIndiaDateTime(call.submission_at)}</td><td>{formatIndiaDateTime(call.relog_due_at)}</td>
                           <td>{renderTat(call)}</td>
-                          <td><button className="service-call-link" onClick={() => applyQuickFilter('search', call.soin)}>Open filtered list</button></td>
+                          <td><button className="service-call-link" onClick={() => applyQuickFilter('soin', call.soin)}>Open filtered list</button></td>
                         </tr>
                       ))}</tbody>
                     </table>

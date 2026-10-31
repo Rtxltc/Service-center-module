@@ -70,6 +70,12 @@ const parseFilters = (query) => {
     }
     filters.search = query.search.trim();
   }
+  if (query.soin !== undefined) {
+    if (typeof query.soin !== 'string' || query.soin.length > 100) {
+      throw Object.assign(new Error('soin must be 100 characters or fewer'), { status: 400 });
+    }
+    filters.soin = query.soin.trim();
+  }
   return filters;
 };
 
@@ -406,3 +412,4 @@ const registerServiceCallRoutes = (app, db, checkAdminAuth) => {
 
 module.exports = registerServiceCallRoutes;
 module.exports.parseCall = parseCall;
+module.exports.parseFilters = parseFilters;
