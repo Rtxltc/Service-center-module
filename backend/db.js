@@ -872,7 +872,7 @@ async function mockQuery(text, params = []) {
 
 const SERVICE_CALL_FIELDS = [
   'soin', 'device_type', 'imei', 'customer_name', 'customer_contact', 'model', 'issue_description',
-  'warranty_status', 'call_type', 'part_order_status', 'mail_sent', 'submission_at',
+  'warranty_status', 'call_type', 'part_order_status', 'part_awb', 'mail_sent', 'submission_at',
   'activation_date', 'warranty_expiry_date', 'mtm_number', 'market_name', 'second_imei',
   'relog_due_at', 'quotation_amount', 'submitted_amount', 'payment_method',
   'created_by', 'updated_by'
@@ -900,7 +900,7 @@ const serviceCallWhere = (filters, values) => {
   if (filters.search) {
     values.push(`%${filters.search.replace(/[\\%_]/g, '\\$&')}%`);
     const parameter = `$${values.length}`;
-    clauses.push(`(soin ILIKE ${parameter} OR imei ILIKE ${parameter} OR second_imei ILIKE ${parameter} OR market_name ILIKE ${parameter} OR mtm_number ILIKE ${parameter} OR customer_name ILIKE ${parameter} OR customer_contact ILIKE ${parameter} OR model ILIKE ${parameter})`);
+    clauses.push(`(soin ILIKE ${parameter} OR imei ILIKE ${parameter} OR second_imei ILIKE ${parameter} OR market_name ILIKE ${parameter} OR mtm_number ILIKE ${parameter} OR customer_name ILIKE ${parameter} OR customer_contact ILIKE ${parameter} OR model ILIKE ${parameter} OR part_awb ILIKE ${parameter})`);
   }
   return clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 };
@@ -935,7 +935,8 @@ const applySupabaseServiceFilters = (query, filters) => {
         `mtm_number.ilike.${pattern}`,
         `customer_name.ilike.${pattern}`,
         `customer_contact.ilike.${pattern}`,
-        `model.ilike.${pattern}`
+        `model.ilike.${pattern}`,
+        `part_awb.ilike.${pattern}`
       ].join(','));
     }
   }
@@ -962,7 +963,7 @@ const serviceCalls = {
         const matchesDate = (!filters.dateFrom || submission >= new Date(filters.dateFrom).getTime())
           && (!filters.dateToExclusive || submission < new Date(filters.dateToExclusive).getTime());
         const matchesSoin = !filters.soin || String(call.soin || '').toLowerCase().includes(filters.soin.toLowerCase());
-        const matchesSearch = !search || [call.soin, call.imei, call.second_imei, call.market_name, call.mtm_number, call.customer_name, call.customer_contact, call.model]
+        const matchesSearch = !search || [call.soin, call.imei, call.second_imei, call.market_name, call.mtm_number, call.customer_name, call.customer_contact, call.model, call.part_awb]
           .some(value => String(value || '').toLowerCase().includes(search));
         const matchesWarranty = !filters.warrantyStatus || call.warranty_status === filters.warrantyStatus;
         const matchesCallType = !filters.callType || call.call_type === filters.callType;
@@ -1025,7 +1026,7 @@ const serviceCalls = {
         return (!filters.dateFrom || submission >= new Date(filters.dateFrom).getTime())
           && (!filters.dateToExclusive || submission < new Date(filters.dateToExclusive).getTime())
           && (!filters.soin || String(call.soin || '').toLowerCase().includes(filters.soin.toLowerCase()))
-          && (!search || [call.soin, call.imei, call.second_imei, call.market_name, call.mtm_number, call.customer_name, call.customer_contact, call.model]
+          && (!search || [call.soin, call.imei, call.second_imei, call.market_name, call.mtm_number, call.customer_name, call.customer_contact, call.model, call.part_awb]
             .some(value => String(value || '').toLowerCase().includes(search)))
           && (!filters.warrantyStatus || call.warranty_status === filters.warrantyStatus)
           && (!filters.callType || call.call_type === filters.callType)

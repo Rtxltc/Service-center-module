@@ -1293,7 +1293,7 @@ textarea.form-input {
 }
 
 .service-calls-table {
-  min-width: 1800px;
+  min-width: 1080px;
   font-size: 0.78rem;
 }
 
@@ -1308,13 +1308,37 @@ textarea.form-input {
 }
 
 .service-call-issue {
-  max-width: 230px;
+  max-width: 260px;
   white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .service-call-row-actions {
-  min-width: 180px;
-  white-space: nowrap;
+  min-width: 250px;
+  white-space: normal;
+}
+
+.service-call-row-actions .service-call-link {
+  display: inline-block;
+  margin-right: 5px;
+}
+
+.service-call-subtext {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.service-call-awb-link {
+  color: var(--color-moto);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.service-call-awb-link:hover {
+  text-decoration: underline;
 }
 
 .service-call-link {

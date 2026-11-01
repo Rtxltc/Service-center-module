@@ -186,6 +186,7 @@ const parseCall = (input, existing = null, administratorId = null) => {
     warranty_status: merged.warranty_status,
     call_type: merged.call_type,
     part_order_status: merged.part_order_status,
+    part_awb: optionalText('part_awb', 100),
     mail_sent: input.mail_sent === undefined ? Boolean(existing && existing.mail_sent) : input.mail_sent,
     activation_date: parseOptionalDate('activation_date'),
     warranty_expiry_date: parseOptionalDate('warranty_expiry_date'),
@@ -390,6 +391,22 @@ const registerServiceCallRoutes = (app, db, checkAdminAuth) => {
       res.json({ call: decorateCall(result.call), history: result.history });
     } catch (error) {
       safeError(res, error, 'Failed to update SOIN');
+    }
+  });
+
+  app.patch(`${base}/:id/awb`, checkAdminAuth, async (req, res) => {
+    try {
+      if (typeof req.body.part_awb !== 'string') {
+        return res.status(400).json({ error: 'part_awb must be a string' });
+      }
+      const current = await db.serviceCalls.get(req.params.id);
+      if (!current) return res.status(404).json({ error: 'Service call not found' });
+      const record = parseCall({ part_awb: req.body.part_awb ?? '' }, current, req.adminUser || 'admin');
+      const updated = await db.serviceCalls.update(req.params.id, record);
+      if (!updated) return res.status(404).json({ error: 'Service call not found' });
+      res.json(decorateCall(updated));
+    } catch (error) {
+      safeError(res, error, 'Failed to update part AWB');
     }
   });
 

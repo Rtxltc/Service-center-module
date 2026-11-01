@@ -39,6 +39,7 @@ test('service-call export is a formatted XLSX workbook with safe text cells', ()
     warranty_status: 'Out of Warranty',
     call_type: 'Hardware',
     part_order_status: 'Ordered',
+    part_awb: 'AWB-12345',
     mail_sent: false,
     submission_at: '2026-10-27T09:00:00.000Z',
     relog_due_at: '2026-10-29T08:00:00.000Z',
@@ -53,8 +54,9 @@ test('service-call export is a formatted XLSX workbook with safe text cells', ()
   assert.equal(workbook.subarray(0, 2).toString('ascii'), 'PK');
   const sheet = readZipEntry(workbook, 'xl/worksheets/sheet1.xml');
   const styles = readZipEntry(workbook, 'xl/styles.xml');
-  assert.ok(sheet.includes('<autoFilter ref="A1:X2"/>'));
+  assert.ok(sheet.includes('<autoFilter ref="A1:Y2"/>'));
   assert.ok(sheet.includes('543210987654321'));
+  assert.ok(sheet.includes('AWB-12345'));
   assert.ok(sheet.includes('MTM-456'));
   assert.ok(sheet.includes('state="frozen"'));
   assert.ok(sheet.includes('t="inlineStr"'));

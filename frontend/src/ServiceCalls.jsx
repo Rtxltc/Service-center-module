@@ -100,6 +100,7 @@ const inputDateTime = (value) => {
 };
 
 const indiaInputToISOString = (value) => new Date(`${value}:00+05:30`).toISOString();
+const awbTrackingUrl = (awb) => `https://www.17track.net/en?nums=${encodeURIComponent(awb)}`;
 
 const formatIndiaDateTime = (value) => value
   ? new Intl.DateTimeFormat('en-GB', {
@@ -150,6 +151,8 @@ function ServiceCalls({ apiBase, password }) {
   const [editingId, setEditingId] = useState(null);
   const [soinForm, setSoinForm] = useState({ soin: '', reason: '' });
   const [soinModalOpen, setSoinModalOpen] = useState(false);
+  const [awbForm, setAwbForm] = useState('');
+  const [awbModalOpen, setAwbModalOpen] = useState(false);
   const [tatNow, setTatNow] = useState(() => performance.now());
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -286,6 +289,14 @@ function ServiceCalls({ apiBase, password }) {
       submission_at: inputDateTime(call.submission_at)
     });
     setView('form');
+  };
+
+  const openAwbEditor = (call) => {
+    setSelectedCall(call);
+    setAwbForm(call.part_awb || '');
+    setAwbModalOpen(true);
+    setError('');
+    setNotice('');
   };
 
   const findModelName = async (value = modelCode) => {
@@ -517,6 +528,34 @@ function ServiceCalls({ apiBase, password }) {
     }
   };
 
+  const saveAwb = async (event) => {
+    event.preventDefault();
+    if (!selectedCall) return;
+    const awb = awbForm.trim();
+    const trackerWindow = window.open('about:blank', '_blank');
+    if (trackerWindow) trackerWindow.opener = null;
+    setLoading(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await request(`/service-calls/${selectedCall.id}/awb`, {
+        method: 'PATCH',
+        body: JSON.stringify({ part_awb: awb })
+      });
+      const updatedCall = { ...(await response.json()), _tatObservedAt: performance.now() };
+      setSelectedCall(updatedCall);
+      setCalls(current => current.map(call => call.id === updatedCall.id ? updatedCall : call));
+      setAwbModalOpen(false);
+      setNotice('AWB updated. Courier tracking is available on 17TRACK.');
+      if (trackerWindow) trackerWindow.location.href = awbTrackingUrl(awb);
+    } catch (reason) {
+      if (trackerWindow) trackerWindow.close();
+      showError(reason);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const exportCalls = async () => {
     setExporting(true);
     setError('');
@@ -640,17 +679,9 @@ function ServiceCalls({ apiBase, password }) {
                 {[
                   ['Total service calls', 'total', 'all', ''],
                   ['Submitted today', 'submitted_today', 'submitted_today', ''],
-                  ['IN TAT', 'in_tat', 'tat_status', 'IN TAT'],
                   ['TAT Missed', 'tat_missed', 'tat_status', 'TAT Missed'],
                   ['Approaching deadline', 'approaching_tat', 'approaching_tat', 'true'],
-                  ['Hardware', 'hardware', 'call_type', 'Hardware'],
-                  ['Software', 'software', 'call_type', 'Software'],
-                  ['In Warranty', 'in_warranty', 'warranty_status', 'In Warranty'],
-                  ['Out of Warranty', 'out_of_warranty', 'warranty_status', 'Out of Warranty'],
-                  ['Parts ordered', 'parts_ordered', 'part_order_status', 'Ordered'],
-                  ['Parts not ordered', 'parts_not_ordered', 'part_order_status', 'Not Yet Ordered'],
-                  ['Approval email sent', 'mail_sent', 'mail_sent', 'true'],
-                  ['Approval email not sent', 'mail_not_sent', 'mail_sent', 'false']
+                  ['IN TAT', 'in_tat', 'tat_status', 'IN TAT']
                 ].map(([label, key, filterKey, value]) => (
                   <button className="service-call-stat" key={key} onClick={() => filterKey && applyQuickFilter(filterKey, value)}>
                     <span>{label}</span><strong>{dashboard.stats[key] ?? 0}</strong>
@@ -695,21 +726,26 @@ function ServiceCalls({ apiBase, password }) {
             <div className="table-responsive">
               <table className="admin-table service-calls-table">
                 <thead><tr>
-                  <th><button onClick={() => changeSort('soin')}>SOIN</button></th><th>IMEI</th><th>Customer</th><th>Contact</th><th>Model</th><th>Issue</th><th>Warranty</th><th>Type</th><th>Parts</th><th>Approval email</th>
-                  <th><button onClick={() => changeSort('submission_at')}>Submission</button></th><th><button onClick={() => changeSort('relog_due_at')}>TAT deadline</button></th>
-                  <th>TAT status</th><th>Quotation</th><th>Submitted</th><th>Payment</th><th>Actions</th>
+                  <th><button onClick={() => changeSort('soin')}>SOIN</button></th><th>Customer</th><th>Device / issue</th><th>Parts / AWB</th>
+                  <th><button onClick={() => changeSort('submission_at')}>Submitted</button></th><th>TAT status</th><th>Actions</th>
                 </tr></thead>
                 <tbody>{calls.map(call => (
                   <tr key={call.id}>
-                    <td><strong>{call.soin}</strong></td><td>{call.imei || '—'}</td><td>{call.customer_name}</td><td>{call.customer_contact}</td><td>{call.model}</td>
-                    <td className="service-call-issue">{call.issue_description}</td><td>{call.warranty_status}</td><td>{call.call_type}</td><td>{call.part_order_status}</td><td>{call.mail_sent ? 'Sent' : 'Not sent'}</td>
-                    <td>{formatIndiaDateTime(call.submission_at)}</td><td>{formatIndiaDateTime(call.relog_due_at)}</td><td>{renderTat(call)}</td>
-                    <td>{call.quotation_amount == null ? '—' : `₹${Number(call.quotation_amount).toFixed(2)}`}</td>
-                    <td>{call.submitted_amount == null ? '—' : `₹${Number(call.submitted_amount).toFixed(2)}`}</td><td>{call.payment_method || '—'}</td>
+                    <td><strong>{call.soin}</strong></td>
+                    <td><strong>{call.customer_name}</strong><small className="service-call-subtext">{call.customer_contact}</small></td>
+                    <td><strong>{call.model}</strong><small className="service-call-subtext service-call-issue" title={call.issue_description}>{call.issue_description}</small></td>
+                    <td><strong>{call.part_order_status}</strong><small className="service-call-subtext">
+                      {call.part_awb
+                        ? <a className="service-call-awb-link" href={awbTrackingUrl(call.part_awb)} target="_blank" rel="noreferrer">AWB {call.part_awb} · Track</a>
+                        : 'AWB not set'}
+                    </small></td>
+                    <td>{formatIndiaDateTime(call.submission_at)}</td>
+                    <td>{renderTat(call)}<small className="service-call-subtext">Due {formatIndiaDateTime(call.relog_due_at)}</small></td>
                     <td className="service-call-row-actions">
                       <button className="service-call-link" onClick={() => openDetails(call)}>Details</button>
                       <button className="service-call-link" onClick={() => openEditForm(call)}>Edit</button>
                       <button className="service-call-link" onClick={() => { setSelectedCall(call); setSoinForm({ soin: call.soin, reason: '' }); setSoinModalOpen(true); }}>Update SOIN</button>
+                      <button className="service-call-link" onClick={() => openAwbEditor(call)}>UPDATE AWB</button>
                       {!call.mail_sent && (call.approval_email_sending
                         ? <button className="service-call-link" onClick={() => resolveApprovalSend(call, 'list')} disabled={approvalBusy}>Resolve send</button>
                         : <button className="service-call-link" onClick={() => openApprovalComposer(call, 'list')} disabled={approvalBusy}>Send mail</button>)}
@@ -774,6 +810,9 @@ function ServiceCalls({ apiBase, password }) {
             {[
               ['Device type', selectedCall.device_type], ['IMEI', selectedCall.imei || '—'], ['Customer contact', selectedCall.customer_contact], ['Issue', selectedCall.issue_description],
               ['Second IMEI', selectedCall.second_imei || '—'], ['Market name', selectedCall.market_name || '—'], ['MTM number', selectedCall.mtm_number || '—'],
+              ['Part AWB', selectedCall.part_awb
+                ? <a key="part-awb-link" href={awbTrackingUrl(selectedCall.part_awb)} target="_blank" rel="noreferrer">{selectedCall.part_awb} · Track courier status</a>
+                : 'Not set'],
               ['Activation date', selectedCall.activation_date || '—'], ['Warranty expiry date', selectedCall.warranty_expiry_date || '—'],
               ['Warranty', selectedCall.warranty_status], ['Call type', selectedCall.call_type], ['Parts', selectedCall.part_order_status],
               ['Parts approval email', selectedCall.mail_sent ? 'Sent' : 'Not sent'], ['Submission', formatIndiaDateTime(selectedCall.submission_at)],
@@ -787,6 +826,7 @@ function ServiceCalls({ apiBase, password }) {
             <button className="btn btn-secondary" onClick={() => setView('list')}>Back to calls</button>
             <button className="btn btn-secondary" onClick={() => openEditForm(selectedCall)}>Edit</button>
             <button className="btn btn-primary" onClick={() => { setSoinForm({ soin: selectedCall.soin, reason: '' }); setSoinModalOpen(true); }}>Update SOIN</button>
+            <button className="btn btn-primary" onClick={() => openAwbEditor(selectedCall)}>UPDATE AWB</button>
             {!selectedCall.mail_sent && (selectedCall.approval_email_sending
               ? <button className="btn btn-secondary" onClick={() => resolveApprovalSend(selectedCall, 'details')} disabled={approvalBusy}>Resolve send status</button>
               : <button className="btn btn-primary" onClick={() => openApprovalComposer(selectedCall, 'details')} disabled={approvalBusy}>Send mail</button>)}
@@ -864,6 +904,19 @@ function ServiceCalls({ apiBase, password }) {
             <label>New SOIN<input className="form-input" value={soinForm.soin} onChange={event => setSoinForm({ ...soinForm, soin: event.target.value })} maxLength="100" required /></label>
             <label>Reason (optional)<textarea className="form-input" rows="3" maxLength="500" value={soinForm.reason} onChange={event => setSoinForm({ ...soinForm, reason: event.target.value })} /></label>
             <div className="service-call-form-actions"><button className="btn btn-primary" disabled={loading}>Confirm SOIN change</button><button className="btn btn-secondary" type="button" onClick={() => setSoinModalOpen(false)}>Cancel</button></div>
+          </form>
+        </div>
+      )}
+      {awbModalOpen && selectedCall && (
+        <div className="service-call-modal-backdrop" role="presentation">
+          <form className="service-call-modal" onSubmit={saveAwb}>
+            <h4>Update part AWB · {selectedCall.soin}</h4>
+            <label>AWB number<input className="form-input" value={awbForm} onChange={event => setAwbForm(event.target.value)} maxLength="100" required autoFocus /></label>
+            <p className="service-call-approval-status">Save the AWB to open 17TRACK. Its courier status is shown on that public tracking page.</p>
+            <div className="service-call-form-actions">
+              <button className="btn btn-primary" disabled={loading}>{loading ? 'Updating…' : 'Save AWB & Track'}</button>
+              <button className="btn btn-secondary" type="button" disabled={loading} onClick={() => setAwbModalOpen(false)}>Cancel</button>
+            </div>
           </form>
         </div>
       )}

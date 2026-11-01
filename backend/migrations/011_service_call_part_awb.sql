@@ -1,0 +1,2 @@
+ALTER TABLE service_calls
+    ADD COLUMN IF NOT EXISTS part_awb VARCHAR(100);

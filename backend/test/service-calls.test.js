@@ -74,3 +74,108 @@ test('service-call SOIN filter is passed to the export query', async () => {
   assert.equal(receivedFilters.soin, 'SO-123');
   assert.equal(response.statusCode, 404);
 });
+
+test('service-call AWB update trims the tracking number and persists it', async () => {
+  const routes = new Map();
+  const app = {
+    get() {},
+    post() {},
+    patch: (path, ...handlers) => routes.set(`PATCH ${path}`, handlers[handlers.length - 1]),
+    put() {}
+  };
+  const existing = {
+    id: 12,
+    soin: 'SO-123',
+    device_type: 'Mobile',
+    imei: '123456789012345',
+    customer_name: 'Customer',
+    customer_contact: '9876543210',
+    model: 'Moto Edge',
+    issue_description: 'Screen issue',
+    warranty_status: 'In Warranty',
+    call_type: 'Hardware',
+    part_order_status: 'Ordered',
+    part_awb: null,
+    mail_sent: false,
+    submission_at: '2026-10-27T09:00:00.000Z',
+    relog_due_at: '2026-10-29T08:00:00.000Z'
+  };
+  let updatedRecord;
+  registerServiceCallRoutes(app, {
+    serviceCalls: {
+      get: async () => existing,
+      update: async (id, record) => {
+        updatedRecord = record;
+        return { ...existing, ...record };
+      }
+    }
+  }, () => {});
+
+  const response = {
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    }
+  };
+  await routes.get('PATCH /api/service-calls/:id/awb')({
+    params: { id: '12' },
+    body: { part_awb: '  AWB-12345  ' }
+  }, response);
+
+  assert.equal(response.body.part_awb, 'AWB-12345');
+  assert.equal(updatedRecord.part_awb, 'AWB-12345');
+});
+
+test('service-call AWB update rejects values over 100 characters', async () => {
+  const routes = new Map();
+  const app = {
+    get() {},
+    post() {},
+    patch: (path, ...handlers) => routes.set(`PATCH ${path}`, handlers[handlers.length - 1]),
+    put() {}
+  };
+  const existing = {
+    id: 12,
+    soin: 'SO-123',
+    device_type: 'Mobile',
+    imei: '123456789012345',
+    customer_name: 'Customer',
+    customer_contact: '9876543210',
+    model: 'Moto Edge',
+    issue_description: 'Screen issue',
+    warranty_status: 'In Warranty',
+    call_type: 'Hardware',
+    part_order_status: 'Ordered',
+    mail_sent: false,
+    submission_at: '2026-10-27T09:00:00.000Z',
+    relog_due_at: '2026-10-29T08:00:00.000Z'
+  };
+  registerServiceCallRoutes(app, {
+    serviceCalls: {
+      get: async () => existing,
+      update: async () => assert.fail('Invalid AWB must not be persisted')
+    }
+  }, () => {});
+
+  const response = {
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    }
+  };
+  await routes.get('PATCH /api/service-calls/:id/awb')({
+    params: { id: '12' },
+    body: { part_awb: 'A'.repeat(101) }
+  }, response);
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(response.body.error, 'part_awb must be 100 characters or fewer');
+});
