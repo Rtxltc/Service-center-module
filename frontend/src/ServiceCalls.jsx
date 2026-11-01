@@ -100,7 +100,11 @@ const inputDateTime = (value) => {
 };
 
 const indiaInputToISOString = (value) => new Date(`${value}:00+05:30`).toISOString();
-const awbTrackingUrl = (awb) => `https://www.17track.net/en?nums=${encodeURIComponent(awb)}`;
+const PART_COURIER_TRACKING = {
+  providerUrl: 'https://www.aftership.com/track',
+  courier: 'bluedart'
+};
+const awbTrackingUrl = (awb) => `${PART_COURIER_TRACKING.providerUrl}/${PART_COURIER_TRACKING.courier}/${encodeURIComponent(awb)}`;
 
 const formatIndiaDateTime = (value) => value
   ? new Intl.DateTimeFormat('en-GB', {
@@ -546,7 +550,7 @@ function ServiceCalls({ apiBase, password }) {
       setSelectedCall(updatedCall);
       setCalls(current => current.map(call => call.id === updatedCall.id ? updatedCall : call));
       setAwbModalOpen(false);
-      setNotice('AWB updated. Courier tracking is available on 17TRACK.');
+      setNotice('AWB updated. Blue Dart tracking is available on AfterShip.');
       if (trackerWindow) trackerWindow.location.href = awbTrackingUrl(awb);
     } catch (reason) {
       if (trackerWindow) trackerWindow.close();
@@ -912,7 +916,7 @@ function ServiceCalls({ apiBase, password }) {
           <form className="service-call-modal" onSubmit={saveAwb}>
             <h4>Update part AWB · {selectedCall.soin}</h4>
             <label>AWB number<input className="form-input" value={awbForm} onChange={event => setAwbForm(event.target.value)} maxLength="100" required autoFocus /></label>
-            <p className="service-call-approval-status">Save the AWB to open 17TRACK. Its courier status is shown on that public tracking page.</p>
+            <p className="service-call-approval-status">Save the AWB to open Blue Dart India tracking on AfterShip.</p>
             <div className="service-call-form-actions">
               <button className="btn btn-primary" disabled={loading}>{loading ? 'Updating…' : 'Save AWB & Track'}</button>
               <button className="btn btn-secondary" type="button" disabled={loading} onClick={() => setAwbModalOpen(false)}>Cancel</button>
