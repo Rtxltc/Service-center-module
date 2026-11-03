@@ -549,6 +549,25 @@ function writeMockData(data) {
   fs.writeFileSync(mockFilePath, JSON.stringify(data, null, 2));
 }
 
+const normalizedSoin = (soin) => String(soin || '').trim().toLowerCase();
+const duplicateSoinError = (message = 'SOIN is already in use.') => Object.assign(new Error(message), { code: '23505' });
+const hasMotoSoinConflict = (data, soin, sourceServiceCallId, excludedMotoId = null) => {
+  const normalized = normalizedSoin(soin);
+  return normalized && (data.moto_repairs || []).some(repair => (
+    String(repair.id) !== String(excludedMotoId)
+      && normalizedSoin(repair.soin) === normalized
+      && !(sourceServiceCallId != null
+        && String(repair.source_service_call_id) === String(sourceServiceCallId))
+  ));
+};
+const hasServiceCallSoinConflict = (data, soin, excludedServiceCallId = null) => {
+  const normalized = normalizedSoin(soin);
+  return normalized && (data.service_calls || []).some(call => (
+    String(call.id) !== String(excludedServiceCallId)
+      && normalizedSoin(call.soin) === normalized
+  ));
+};
+
 async function mockQuery(text, params = []) {
   const data = readMockData();
 
@@ -654,6 +673,9 @@ async function mockQuery(text, params = []) {
 
   if (text.includes('INSERT INTO moto_repairs')) {
     const [ticket_id, brand, soin, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, cash_collected, qr_collected, warranty_status, receiving_date, giving_date] = params;
+    if (soin && (hasMotoSoinConflict(data, soin, null) || hasServiceCallSoinConflict(data, soin))) {
+      throw duplicateSoinError();
+    }
     const newId = data.moto_repairs && data.moto_repairs.length > 0 ? Math.max(...data.moto_repairs.map(r => r.id)) + 1 : 1;
     const newRepair = {
       id: newId,
@@ -687,8 +709,19 @@ async function mockQuery(text, params = []) {
     const [soin, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, cash_collected, qr_collected, warranty_status, receiving_date, giving_date, id] = params;
     const idx = data.moto_repairs ? data.moto_repairs.findIndex(r => r.id === parseInt(id)) : -1;
     if (idx === -1) return { rows: [], rowCount: 0 };
+    const existing = data.moto_repairs[idx];
+    const linkedCall = existing.source_service_call_id == null
+      ? null
+      : (data.service_calls || []).find(call => String(call.id) === String(existing.source_service_call_id));
+    if (linkedCall && normalizedSoin(linkedCall.soin) !== normalizedSoin(soin)) {
+      throw duplicateSoinError('Update SOIN from its linked service call.');
+    }
+    if (soin && (hasMotoSoinConflict(data, soin, existing.source_service_call_id, existing.id)
+      || hasServiceCallSoinConflict(data, soin, existing.source_service_call_id))) {
+      throw duplicateSoinError();
+    }
     data.moto_repairs[idx] = {
-      ...data.moto_repairs[idx],
+      ...existing,
       soin: soin || null,
       device_model,
       issue_description,
@@ -1259,10 +1292,8 @@ const serviceCalls = {
     if (!usePG) {
       const data = readMockData();
       data.service_calls = data.service_calls || [];
-      if (data.service_calls.some(call => call.soin.toLowerCase() === record.soin.toLowerCase())) {
-        const error = new Error('Duplicate SOIN');
-        error.code = '23505';
-        throw error;
+      if (hasServiceCallSoinConflict(data, record.soin) || hasMotoSoinConflict(data, record.soin, null)) {
+        throw duplicateSoinError();
       }
       const now = new Date().toISOString();
       const created = {
@@ -1335,10 +1366,9 @@ const serviceCalls = {
       const data = readMockData();
       const call = (data.service_calls || []).find(item => String(item.id) === String(id));
       if (!call) return null;
-      if (data.service_calls.some(item => item.id !== call.id && item.soin.toLowerCase() === record.soin.toLowerCase())) {
-        const error = new Error('Duplicate SOIN');
-        error.code = '23505';
-        throw error;
+      if (hasServiceCallSoinConflict(data, record.soin, call.id)
+        || hasMotoSoinConflict(data, record.soin, call.id)) {
+        throw duplicateSoinError();
       }
       const submissionChanged = new Date(call.submission_at).getTime() !== new Date(record.submission_at).getTime();
       Object.assign(call, record, {
@@ -1384,10 +1414,9 @@ const serviceCalls = {
       data.service_call_soin_history = data.service_call_soin_history || [];
       const call = data.service_calls.find(item => String(item.id) === String(id));
       if (!call) return null;
-      if (data.service_calls.some(item => item.id !== call.id && item.soin.toLowerCase() === soin.toLowerCase())) {
-        const error = new Error('Duplicate SOIN');
-        error.code = '23505';
-        throw error;
+      if (hasServiceCallSoinConflict(data, soin, call.id)
+        || hasMotoSoinConflict(data, soin, call.id)) {
+        throw duplicateSoinError();
       }
       const history = {
         id: data.service_call_soin_history.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0) + 1,
@@ -1399,6 +1428,9 @@ const serviceCalls = {
         reason: reason || null
       };
       call.soin = soin;
+      for (const repair of data.moto_repairs || []) {
+        if (String(repair.source_service_call_id) === String(call.id)) repair.soin = soin;
+      }
       call.relog_due_at = new Date(Date.now() + 47 * 60 * 60 * 1000).toISOString();
       call.reminder_stage = 0;
       call.reminder_cycle = Number(call.reminder_cycle || 0) + 1;
@@ -1466,10 +1498,9 @@ const serviceCalls = {
       const call = data.service_calls.find(item => String(item.id) === String(id));
       if (!call || Number(call.reminder_cycle || 0) !== Number(cycle)
         || Number(call.reminder_stage || 0) < 1 || call.soin === soin) return null;
-      if (data.service_calls.some(item => item.id !== call.id && item.soin.toLowerCase() === soin.toLowerCase())) {
-        const error = new Error('Duplicate SOIN');
-        error.code = '23505';
-        throw error;
+      if (hasServiceCallSoinConflict(data, soin, call.id)
+        || hasMotoSoinConflict(data, soin, call.id)) {
+        throw duplicateSoinError();
       }
       const changedAt = new Date().toISOString();
       const history = {
@@ -1491,6 +1522,9 @@ const serviceCalls = {
         updated_by: 'email',
         updated_at: changedAt
       });
+      for (const repair of data.moto_repairs || []) {
+        if (String(repair.source_service_call_id) === String(call.id)) repair.soin = soin;
+      }
       data.service_call_soin_history.push(history);
       writeMockData(data);
       return { call, history };

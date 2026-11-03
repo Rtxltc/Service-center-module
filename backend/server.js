@@ -8,6 +8,11 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
+const isSoinConflict = (error) => error.code === '23505'
+  && /soin|global_soin_unique|idx_service_calls_soin_ci/i.test(
+    `${error.constraint || ''} ${error.message || ''}`
+  );
+
 // Middleware
 app.use(cors({
   origin: '*', // Allow all origins for local testing, can lock down to specific URL if needed
@@ -337,6 +342,12 @@ app.post('/api/admin/moto', checkAdminAuth, async (req, res) => {
     const result = await db.query(queryText, values);
     res.status(201).json({ success: true, repair: result.rows[0] });
   } catch (err) {
+    if (isSoinConflict(err)) {
+      const error = /linked service call/i.test(err.message)
+        ? 'Update the SOIN from its linked Service Call record.'
+        : 'SOIN is already in use by another record.';
+      return res.status(409).json({ error });
+    }
     console.error('Error creating moto repair:', err);
     res.status(500).json({ error: 'Server error' });
   }
@@ -408,6 +419,12 @@ app.put('/api/admin/moto/:id', checkAdminAuth, async (req, res) => {
     const result = await db.query(queryText, values);
     res.json({ success: true, repair: result.rows[0] });
   } catch (err) {
+    if (isSoinConflict(err)) {
+      const error = /linked service call/i.test(err.message)
+        ? 'Update the SOIN from its linked Service Call record.'
+        : 'SOIN is already in use by another record.';
+      return res.status(409).json({ error });
+    }
     console.error('Error updating moto repair:', err);
     res.status(500).json({ error: 'Server error' });
   }

@@ -218,7 +218,7 @@ const decorateCall = (call, now = Date.now()) => {
 const safeError = (res, error, fallback = 'Service call request failed') => {
   if (error.status && !error.code) return res.status(error.status).json({ error: error.message });
   if (error.code === '23505') {
-    return res.status(409).json({ error: 'That SOIN is already in use.' });
+    return res.status(409).json({ error: 'That SOIN is already in use by another record.' });
   }
   console.error(fallback, error);
   return res.status(500).json({ error: fallback });
