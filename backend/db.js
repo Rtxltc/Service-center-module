@@ -367,14 +367,20 @@ async function supabaseQuery(text, params = []) {
       .select('*')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return { rows: data, rowCount: data ? data.length : 0 };
+    const rows = (data || []).map(repair => ({
+      ...repair,
+      cash_collected: repair.cash_collected ?? (repair.payment_method === 'QR' ? 0 : repair.amount_collected || 0),
+      qr_collected: repair.qr_collected ?? (repair.payment_method === 'QR' ? repair.amount_collected || 0 : 0)
+    }));
+    return { rows, rowCount: rows.length };
   }
 
   if (queryNormalized.includes('INSERT INTO laptop_repairs')) {
     const [
       ticket_id, brand, device_model, issue_description, customer_name,
       customer_email, customer_phone, customer_address, service_type,
-      status, amount_collected, warranty_status, receiving_date, giving_date
+      status, amount_collected, cash_collected, qr_collected,
+      warranty_status, receiving_date, giving_date
     ] = params;
 
     const { data, error } = await supabase
@@ -391,6 +397,8 @@ async function supabaseQuery(text, params = []) {
         service_type: service_type || 'Walk-in',
         status: status || 'Received',
         amount_collected: parseFloat(amount_collected || 0),
+        cash_collected: parseFloat(cash_collected || 0),
+        qr_collected: parseFloat(qr_collected || 0),
         warranty_status: warranty_status || 'Out of Warranty',
         receiving_date: receiving_date || new Date().toISOString(),
         giving_date: giving_date || null
@@ -404,7 +412,8 @@ async function supabaseQuery(text, params = []) {
     const [
       brand, device_model, issue_description, customer_name, customer_email,
       customer_phone, customer_address, service_type, status,
-      amount_collected, warranty_status, receiving_date, giving_date, id
+      amount_collected, cash_collected, qr_collected,
+      warranty_status, receiving_date, giving_date, id
     ] = params;
 
     const { data, error } = await supabase
@@ -420,6 +429,8 @@ async function supabaseQuery(text, params = []) {
         service_type,
         status,
         amount_collected: parseFloat(amount_collected || 0),
+        cash_collected: parseFloat(cash_collected || 0),
+        qr_collected: parseFloat(qr_collected || 0),
         warranty_status,
         receiving_date,
         giving_date,
@@ -515,12 +526,24 @@ async function supabaseQuery(text, params = []) {
     return { rows: [{ total, count }], rowCount: 1 };
   }
 
-  if (queryNormalized.includes('SUM(amount_collected)') && queryNormalized.includes('laptop_repairs')) {
+  if (queryNormalized.includes('SUM(cash_collected)') && queryNormalized.includes('laptop_repairs')) {
     const { data, error } = await supabase
       .from('laptop_repairs')
-      .select('amount_collected');
+      .select('cash_collected')
+      .gt('cash_collected', 0);
     if (error) throw error;
-    const total = data ? data.reduce((sum, r) => sum + parseFloat(r.amount_collected || 0), 0) : 0;
+    const total = data ? data.reduce((sum, r) => sum + parseFloat(r.cash_collected || 0), 0) : 0;
+    const count = data ? data.length : 0;
+    return { rows: [{ total, count }], rowCount: 1 };
+  }
+
+  if (queryNormalized.includes('SUM(qr_collected)') && queryNormalized.includes('laptop_repairs')) {
+    const { data, error } = await supabase
+      .from('laptop_repairs')
+      .select('qr_collected')
+      .gt('qr_collected', 0);
+    if (error) throw error;
+    const total = data ? data.reduce((sum, r) => sum + parseFloat(r.qr_collected || 0), 0) : 0;
     const count = data ? data.length : 0;
     return { rows: [{ total, count }], rowCount: 1 };
   }
@@ -755,11 +778,16 @@ async function mockQuery(text, params = []) {
   // --- laptop_repairs mock queries ---
   if (text.includes('SELECT * FROM laptop_repairs')) {
     const list = [...(data.laptop_repairs || [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    return { rows: list, rowCount: list.length };
+    const rows = list.map(repair => ({
+      ...repair,
+      cash_collected: repair.cash_collected ?? (repair.payment_method === 'QR' ? 0 : repair.amount_collected || 0),
+      qr_collected: repair.qr_collected ?? (repair.payment_method === 'QR' ? repair.amount_collected || 0 : 0)
+    }));
+    return { rows, rowCount: rows.length };
   }
 
   if (text.includes('INSERT INTO laptop_repairs')) {
-    const [ticket_id, brand, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, warranty_status, receiving_date, giving_date] = params;
+    const [ticket_id, brand, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, cash_collected, qr_collected, warranty_status, receiving_date, giving_date] = params;
     const newId = data.laptop_repairs && data.laptop_repairs.length > 0 ? Math.max(...data.laptop_repairs.map(r => r.id)) + 1 : 1;
     const newRepair = {
       id: newId,
@@ -774,6 +802,8 @@ async function mockQuery(text, params = []) {
       service_type: service_type || 'Walk-in',
       status: status || 'Received',
       amount_collected: parseFloat(amount_collected || 0),
+      cash_collected: parseFloat(cash_collected || 0),
+      qr_collected: parseFloat(qr_collected || 0),
       warranty_status: warranty_status || 'Out of Warranty',
       receiving_date: receiving_date || new Date().toISOString(),
       giving_date: giving_date || null,
@@ -787,7 +817,7 @@ async function mockQuery(text, params = []) {
   }
 
   if (text.includes('UPDATE laptop_repairs')) {
-    const [brand, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, warranty_status, receiving_date, giving_date, id] = params;
+    const [brand, device_model, issue_description, customer_name, customer_email, customer_phone, customer_address, service_type, status, amount_collected, cash_collected, qr_collected, warranty_status, receiving_date, giving_date, id] = params;
     const idx = data.laptop_repairs ? data.laptop_repairs.findIndex(r => r.id === parseInt(id)) : -1;
     if (idx === -1) return { rows: [], rowCount: 0 };
     data.laptop_repairs[idx] = {
@@ -802,6 +832,8 @@ async function mockQuery(text, params = []) {
       service_type,
       status,
       amount_collected: parseFloat(amount_collected || 0),
+      cash_collected: parseFloat(cash_collected || 0),
+      qr_collected: parseFloat(qr_collected || 0),
       warranty_status,
       receiving_date,
       giving_date,
@@ -883,9 +915,18 @@ async function mockQuery(text, params = []) {
     return { rows: [{ total, count: repairs.length }], rowCount: 1 };
   }
 
-  if (text.includes('SUM(amount_collected)') && text.includes('laptop_repairs')) {
-    const repairs = data.laptop_repairs || [];
-    const total = repairs.reduce((sum, repair) => sum + parseFloat(repair.amount_collected || 0), 0);
+  if (text.includes('SUM(cash_collected)') && text.includes('laptop_repairs')) {
+    const repairs = (data.laptop_repairs || []).map(repair => ({
+      ...repair,
+      cash_collected: repair.cash_collected ?? (repair.payment_method === 'QR' ? 0 : repair.amount_collected || 0)
+    })).filter(repair => Number(repair.cash_collected || 0) > 0);
+    const total = repairs.reduce((sum, repair) => sum + parseFloat(repair.cash_collected || 0), 0);
+    return { rows: [{ total, count: repairs.length }], rowCount: 1 };
+  }
+
+  if (text.includes('SUM(qr_collected)') && text.includes('laptop_repairs')) {
+    const repairs = (data.laptop_repairs || []).filter(repair => Number(repair.qr_collected || 0) > 0);
+    const total = repairs.reduce((sum, repair) => sum + parseFloat(repair.qr_collected || 0), 0);
     return { rows: [{ total, count: repairs.length }], rowCount: 1 };
   }
 

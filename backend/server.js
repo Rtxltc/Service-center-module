@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./db');
+const { parseCollectedAmounts } = require('./repair-payments');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -242,29 +243,7 @@ const parseDbDate = (val) => {
 };
 
 const parseMotoAmounts = (record) => {
-  const parseAmount = (value, label) => {
-    const text = value == null || value === '' ? '0' : String(value);
-    if (!/^\d{1,8}(\.\d{1,2})?$/.test(text)) {
-      throw Object.assign(new Error(`${label} must be a non-negative amount with up to two decimals`), { status: 400 });
-    }
-    return Number(text);
-  };
-
-  if (record.cash_collected !== undefined || record.qr_collected !== undefined) {
-    const cash = parseAmount(record.cash_collected, 'Cash received');
-    const qr = parseAmount(record.qr_collected, 'QR received');
-    if (cash + qr > 99999999.99) {
-      throw Object.assign(new Error('Combined amount collected cannot exceed 99,999,999.99'), { status: 400 });
-    }
-    return { cash, qr, total: cash + qr };
-  }
-
-  const total = parseAmount(record.amount_collected, 'Amount collected');
-  const method = record.payment_method || 'Cash';
-  if (!['Cash', 'QR'].includes(method)) {
-    throw Object.assign(new Error('Payment method must be Cash or QR'), { status: 400 });
-  }
-  return { cash: method === 'Cash' ? total : 0, qr: method === 'QR' ? total : 0, total };
+  return parseCollectedAmounts(record);
 };
 
 app.get('/api/admin/moto', checkAdminAuth, async (req, res) => {
@@ -470,7 +449,6 @@ app.post('/api/admin/non-moto', checkAdminAuth, async (req, res) => {
     customer_address,
     service_type,
     status,
-    amount_collected,
     warranty_status,
     receiving_date,
     giving_date
@@ -480,14 +458,21 @@ app.post('/api/admin/non-moto', checkAdminAuth, async (req, res) => {
     return res.status(400).json({ error: 'Brand, device model, customer name, and phone are required' });
   }
 
+  let amounts;
+  try {
+    amounts = parseCollectedAmounts(req.body);
+  } catch (error) {
+    return res.status(error.status || 400).json({ error: error.message });
+  }
+
   try {
     const ticketId = generateTicketId(brand);
     const queryText = `
       INSERT INTO laptop_repairs (
         ticket_id, brand, device_model, issue_description, customer_name, 
         customer_email, customer_phone, customer_address, service_type, 
-        status, amount_collected, warranty_status, receiving_date, giving_date
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        status, amount_collected, cash_collected, qr_collected, warranty_status, receiving_date, giving_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *
     `;
     const values = [
@@ -501,7 +486,9 @@ app.post('/api/admin/non-moto', checkAdminAuth, async (req, res) => {
       customer_address || '',
       service_type || 'Walk-in',
       status || 'Received',
-      amount_collected !== undefined ? parseFloat(amount_collected) : 0.00,
+      amounts.total,
+      amounts.cash,
+      amounts.qr,
       warranty_status || 'Out of Warranty',
       parseDbDate(receiving_date) || new Date().toISOString(),
       parseDbDate(giving_date)
@@ -525,6 +512,19 @@ app.put('/api/admin/non-moto/:id', checkAdminAuth, async (req, res) => {
     }
     const existing = getRes.rows[0];
     const merged = { ...existing, ...req.body };
+    let amounts;
+    try {
+      const hasSplitAmounts = Object.hasOwn(req.body, 'cash_collected')
+        || Object.hasOwn(req.body, 'qr_collected');
+      const amountInput = hasSplitAmounts
+        ? merged
+        : req.body.amount_collected !== undefined
+          ? { amount_collected: req.body.amount_collected, payment_method: req.body.payment_method }
+          : merged;
+      amounts = parseCollectedAmounts(amountInput);
+    } catch (error) {
+      return res.status(error.status || 400).json({ error: error.message });
+    }
 
     const queryText = `
       UPDATE laptop_repairs SET
@@ -538,11 +538,13 @@ app.put('/api/admin/non-moto/:id', checkAdminAuth, async (req, res) => {
         service_type = $8,
         status = $9,
         amount_collected = $10,
-        warranty_status = $11,
-        receiving_date = $12,
-        giving_date = $13,
+        cash_collected = $11,
+        qr_collected = $12,
+        warranty_status = $13,
+        receiving_date = $14,
+        giving_date = $15,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $14
+      WHERE id = $16
       RETURNING *
     `;
     const values = [
@@ -555,7 +557,9 @@ app.put('/api/admin/non-moto/:id', checkAdminAuth, async (req, res) => {
       merged.customer_address,
       merged.service_type,
       merged.status,
-      merged.amount_collected !== undefined ? parseFloat(merged.amount_collected) : 0.00,
+      amounts.total,
+      amounts.cash,
+      amounts.qr,
       merged.warranty_status,
       parseDbDate(merged.receiving_date) || new Date().toISOString(),
       parseDbDate(merged.giving_date),
@@ -678,12 +682,14 @@ app.get('/api/admin/overview', checkAdminAuth, async (req, res) => {
   try {
     const motoSumQuery = await db.query('SELECT COALESCE(SUM(cash_collected), 0) as total, COUNT(*) as count FROM moto_repairs WHERE cash_collected > 0');
     const motoQrSumQuery = await db.query('SELECT COALESCE(SUM(qr_collected), 0) as total, COUNT(*) as count FROM moto_repairs WHERE qr_collected > 0');
-    const nonMotoSumQuery = await db.query('SELECT COALESCE(SUM(amount_collected), 0) as total, COUNT(*) as count FROM laptop_repairs');
+    const nonMotoSumQuery = await db.query('SELECT COALESCE(SUM(cash_collected), 0) as total, COUNT(*) as count FROM laptop_repairs');
+    const nonMotoQrSumQuery = await db.query('SELECT COALESCE(SUM(qr_collected), 0) as total, COUNT(*) as count FROM laptop_repairs WHERE qr_collected > 0');
     const expensesSumQuery = await db.query('SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count FROM expenses');
 
     const motoRevenue = parseFloat(motoSumQuery.rows[0].total);
     const motoQrRevenue = parseFloat(motoQrSumQuery.rows[0].total);
     const nonMotoRevenue = parseFloat(nonMotoSumQuery.rows[0].total);
+    const nonMotoQrRevenue = parseFloat(nonMotoQrSumQuery.rows[0].total);
     const totalRevenue = motoRevenue + nonMotoRevenue;
     const totalExpenses = parseFloat(expensesSumQuery.rows[0].total);
     const netProfit = totalRevenue - totalExpenses;
@@ -692,12 +698,14 @@ app.get('/api/admin/overview', checkAdminAuth, async (req, res) => {
       motoRevenue,
       motoQrRevenue,
       nonMotoRevenue,
+      nonMotoQrRevenue,
       totalRevenue,
       totalExpenses,
       netProfit,
       motoCount: parseInt(motoSumQuery.rows[0].count),
       motoQrCount: parseInt(motoQrSumQuery.rows[0].count),
       nonMotoCount: parseInt(nonMotoSumQuery.rows[0].count),
+      nonMotoQrCount: parseInt(nonMotoQrSumQuery.rows[0].count),
       expensesCount: parseInt(expensesSumQuery.rows[0].count)
     });
   } catch (err) {

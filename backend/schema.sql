@@ -99,12 +99,32 @@ CREATE TABLE IF NOT EXISTS laptop_repairs (
     service_type VARCHAR(50) DEFAULT 'Walk-in',
     status VARCHAR(50) DEFAULT 'Received',
     amount_collected NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    cash_collected NUMERIC(10, 2) NOT NULL DEFAULT 0.00 CHECK (cash_collected >= 0),
+    qr_collected NUMERIC(10, 2) NOT NULL DEFAULT 0.00 CHECK (qr_collected >= 0),
     warranty_status VARCHAR(100) DEFAULT 'Out of Warranty',
     receiving_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     giving_date TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE laptop_repairs
+    ADD COLUMN IF NOT EXISTS cash_collected NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    ADD COLUMN IF NOT EXISTS qr_collected NUMERIC(10, 2) NOT NULL DEFAULT 0.00;
+
+UPDATE laptop_repairs
+   SET cash_collected = amount_collected,
+       qr_collected = 0
+ WHERE cash_collected = 0
+   AND qr_collected = 0
+   AND amount_collected > 0;
+
+ALTER TABLE laptop_repairs
+    DROP CONSTRAINT IF EXISTS laptop_repairs_cash_collected_check,
+    DROP CONSTRAINT IF EXISTS laptop_repairs_qr_collected_check;
+ALTER TABLE laptop_repairs
+    ADD CONSTRAINT laptop_repairs_cash_collected_check CHECK (cash_collected >= 0),
+    ADD CONSTRAINT laptop_repairs_qr_collected_check CHECK (qr_collected >= 0);
 
 -- Index on laptop_repairs ticket_id and phone
 CREATE INDEX IF NOT EXISTS idx_laptop_repairs_ticket ON laptop_repairs(ticket_id);

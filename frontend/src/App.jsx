@@ -2028,7 +2028,12 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
             cash_collected: Number(repairForm.cash_collected || 0),
             qr_collected: Number(repairForm.qr_collected || 0)
           }
-          : repairForm)
+          : {
+            ...repairForm,
+            amount_collected: Number(repairForm.cash_collected || 0) + Number(repairForm.qr_collected || 0),
+            cash_collected: Number(repairForm.cash_collected || 0),
+            qr_collected: Number(repairForm.qr_collected || 0)
+          })
       });
 
       if (response.ok) {
@@ -2710,7 +2715,8 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                     <th>Phone / Address</th>
                     <th>Warranty</th>
                     <th>Dates (Recv to Delv)</th>
-                    <th>Amount (₹)</th>
+                    <th>Cash (₹)</th>
+                    <th>QR (₹)</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -2746,7 +2752,8 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                           <div style={{ fontSize: '0.75rem' }}>Recv: {repair.receiving_date ? new Date(repair.receiving_date).toLocaleDateString() : 'N/A'}</div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Delv: {repair.giving_date ? new Date(repair.giving_date).toLocaleDateString() : 'Pending'}</div>
                         </td>
-                        <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{parseFloat(repair.amount_collected || 0).toFixed(2)}</td>
+                        <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{parseFloat(repair.cash_collected ?? repair.amount_collected ?? 0).toFixed(2)}</td>
+                        <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>₹{parseFloat(repair.qr_collected || 0).toFixed(2)}</td>
                         <td>
                           <span className={`status-badge ${repair.status?.toLowerCase().replace(/\s+/g, '-')}`} style={{ 
                             fontSize: '0.75rem', 
@@ -2870,9 +2877,18 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                   <div style={{ width: '40px', height: '40px', background: 'rgba(2, 132, 199, 0.08)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-moto)', marginBottom: '16px' }}>
                     <Laptop size={20} />
                   </div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Laptop/Other Income</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Laptop/Other Cash Income</span>
                   <h4 style={{ fontSize: '1.6rem', fontWeight: '800', margin: '4px 0 2px' }}>₹{parseFloat(overviewData.nonMotoRevenue).toFixed(2)}</h4>
                   <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>From {overviewData.nonMotoCount} repair records</p>
+                </div>
+
+                <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '24px', boxShadow: 'var(--shadow-sm)', textAlign: 'left', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'rgba(124, 58, 237, 0.08)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c3aed', marginBottom: '16px' }}>
+                    <Laptop size={20} />
+                  </div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Laptop/Other QR Collections</span>
+                  <h4 style={{ fontSize: '1.6rem', fontWeight: '800', margin: '4px 0 2px' }}>₹{parseFloat(overviewData.nonMotoQrRevenue || 0).toFixed(2)}</h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Separate from income · {overviewData.nonMotoQrCount || 0} repair records</p>
                 </div>
 
                 {/* Total Revenue Card */}
@@ -2880,9 +2896,9 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                   <div style={{ width: '40px', height: '40px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', marginBottom: '16px' }}>
                     <CheckCircle size={20} />
                   </div>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Total Revenue</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase' }}>Cash Revenue</span>
                   <h4 style={{ fontSize: '1.6rem', fontWeight: '800', margin: '4px 0 2px', color: '#10b981' }}>₹{parseFloat(overviewData.totalRevenue).toFixed(2)}</h4>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Sum of all service earnings</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Moto + Laptop cash; QR excluded</p>
                 </div>
 
                 {/* Expenses Card */}
@@ -3112,17 +3128,27 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">{repairForm.brand === 'Motorola' ? 'Cash Received (₹)' : 'Amount Collected (₹)'}</label>
+                  <label className="form-label">Cash Received (₹)</label>
                   <input
                     type="number" 
                     className="form-input" 
-                    value={repairForm.brand === 'Motorola' ? repairForm.cash_collected : repairForm.amount_collected}
-                    onChange={(e) => setRepairForm(repairForm.brand === 'Motorola'
-                      ? { ...repairForm, cash_collected: e.target.value }
-                      : { ...repairForm, amount_collected: parseFloat(e.target.value) || 0 })}
+                    value={repairForm.cash_collected}
+                    onChange={(e) => setRepairForm({ ...repairForm, cash_collected: e.target.value })}
                     min="0"
                     step="0.01"
                   />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">QR Received (₹)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={repairForm.qr_collected}
+                    onChange={(e) => setRepairForm({ ...repairForm, qr_collected: e.target.value })}
+                    min="0"
+                    step="0.01"
+                  />
+                  <small>Cash and QR are tracked separately; only cash is counted as income.</small>
                 </div>
                 {repairForm.brand === 'Motorola' && (
                   <div className="form-group">
@@ -3135,20 +3161,6 @@ function AdminView({ activeSection = 'admin', setActiveSection }) {
                       placeholder="Enter SOIN for these payments"
                     />
                     <small>Enter the SOIN when recording cash or QR payments.</small>
-                  </div>
-                )}
-                {repairForm.brand === 'Motorola' && (
-                  <div className="form-group">
-                    <label className="form-label">QR Received (₹)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={repairForm.qr_collected}
-                      onChange={(e) => setRepairForm({ ...repairForm, qr_collected: e.target.value })}
-                      min="0"
-                      step="0.01"
-                    />
-                    <small>Both amounts are recorded against this SOIN. Only cash is counted as income.</small>
                   </div>
                 )}
               </div>
